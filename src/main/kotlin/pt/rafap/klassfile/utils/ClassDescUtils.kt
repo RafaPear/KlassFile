@@ -4,6 +4,7 @@ import java.lang.constant.ClassDesc
 import java.lang.constant.ConstantDescs.*
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
+import kotlin.reflect.full.starProjectedType
 import kotlin.reflect.jvm.jvmErasure
 
 
@@ -48,8 +49,13 @@ fun classDesc(klass: KClass<*>): ClassDesc = when (klass) {
 	Boolean::class -> CD_boolean
 	Unit::class -> CD_void
 	String::class -> CD_String
-	else -> klass.java.describeConstable().orElseThrow()
+	else -> {
+		if (klass.isNullable()) nullableClassDesc(klass)
+		else klass.java.describeConstable().orElseThrow()
+	}
 }
+
+private fun KClass<*>.isNullable(): Boolean = starProjectedType.isMarkedNullable
 
 /**
  * Creates a [ClassDesc] from a [KClass].
@@ -59,7 +65,7 @@ fun classDesc(klass: KClass<*>): ClassDesc = when (klass) {
  * @param klass the [KClass] to create a [ClassDesc] for.
  * @return the corresponding [ClassDesc].
  */
-fun nonNullableClassDesc(klass: KClass<*>): ClassDesc = when (klass) {
+fun nullableClassDesc(klass: KClass<*>): ClassDesc = when (klass) {
 	Byte::class -> CD_Byte
 	Short::class -> CD_Short
 	Int::class -> CD_Integer
@@ -85,7 +91,7 @@ fun classDesc(kParameter: KType): ClassDesc {
 	val kClass = kParameter.jvmErasure
 
 	return if (!kParameter.isMarkedNullable) classDesc(kClass)
-	else nonNullableClassDesc(kClass)
+	else nullableClassDesc(kClass)
 }
 
 /**

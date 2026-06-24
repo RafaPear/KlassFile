@@ -2,39 +2,54 @@ package pt.rafap.klassfile
 
 import pt.rafap.klassfile.utils.classDesc
 import java.io.PrintStream
-import java.lang.classfile.ClassFile.ACC_PUBLIC
 
 interface NumberCenas {
-	fun printNumber()
+    fun printNumber()
 }
 
+// TODO:
+// method<Int>() {
+//    val a by parameter<Int>() // ISTO
+//    val b by parameter<Int>()
+//
+//    code { // ISTO
+//        iload(a)
+//        iload(b)
+//        iadd()
+//        ireturn()
+//    }
+//}
+
 fun main() {
-	KlassFileBuilder.klass("ultra") {
-		implements<NumberCenas>()
+    KlassFileBuilder.klass("ultra") {
+        inherit<NumberCenas>()
 
-		val number by field<Int>()
+        access {
+            public()
+        }
 
-		constructor {
-			defaultConstructor()
-			aload(0)
-			ldc(42)
-			putfield(number)
-			return_()
-		}
+        val number by field<Int>()
 
-		val getNumber by method<Int>(ACC_PUBLIC) {
-			getThisField(number)
-			ireturn()
-		}
+        val getNumber by getter(number)
+        val setNumber by setter(number)
 
-		method("printNumber") {
-			getstatic<System>("out")
+        constructor {
+            defaultConstructor()
+            aload(0)
+            ldc(42)
+            setNumber()
+            return_()
+        }
 
-			invokevirtual(getNumber)
+        method("printNumber") {
+            getstatic<System>("out")
 
-			invokevirtual<PrintStream>("println", args = arrayOf(classDesc<Int>()))
-			return_()
-		}
+            aload(0)
+            getNumber()
 
-	}.writeAndGetInstance<NumberCenas>().printNumber()
+            invokevirtual<PrintStream>("println", args = arrayOf(classDesc<Int>()))
+            return_()
+        }
+
+    }.writeAndGetInstance<NumberCenas>().printNumber()
 }

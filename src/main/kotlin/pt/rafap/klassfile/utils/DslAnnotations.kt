@@ -4,7 +4,13 @@ package pt.rafap.klassfile.utils
 annotation class KlassFileDsl
 
 @DslMarker
-annotation class FieldBuilderDsl
+annotation class FieldScopeDsl
 
 @DslMarker
-annotation class MethodBuilderDsl
+annotation class MethodScopeDsl
+
+@DslMarker
+annotation class CodeScopeDsl
+
+@DslMarker
+annotation class FlagsScopeDsl
