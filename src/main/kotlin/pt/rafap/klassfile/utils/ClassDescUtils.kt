@@ -1,12 +1,12 @@
 package pt.rafap.klassfile.utils
 
+import pt.rafap.klassfile.models.KlassDesc
 import java.lang.constant.ClassDesc
 import java.lang.constant.ConstantDescs.*
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.full.starProjectedType
 import kotlin.reflect.jvm.jvmErasure
-
 
 
 /**
@@ -39,20 +39,20 @@ fun classDesc(clazz: Class<*>): ClassDesc = classDesc(clazz.kotlin)
  * @return the corresponding [ClassDesc].
  */
 fun classDesc(klass: KClass<*>): ClassDesc = when (klass) {
-	Byte::class -> CD_byte
-	Short::class -> CD_short
-	Int::class -> CD_int
-	Long::class -> CD_long
-	Float::class -> CD_float
-	Double::class -> CD_double
-	Char::class -> CD_char
-	Boolean::class -> CD_boolean
-	Unit::class -> CD_void
-	String::class -> CD_String
-	else -> {
-		if (klass.isNullable()) nullableClassDesc(klass)
-		else klass.java.describeConstable().orElseThrow()
-	}
+    Byte::class -> CD_byte
+    Short::class -> CD_short
+    Int::class -> CD_int
+    Long::class -> CD_long
+    Float::class -> CD_float
+    Double::class -> CD_double
+    Char::class -> CD_char
+    Boolean::class -> CD_boolean
+    Unit::class -> CD_void
+    String::class -> CD_String
+    else -> {
+        if (klass.isNullable()) nullableClassDesc(klass)
+        else klass.java.describeConstable().orElseThrow()
+    }
 }
 
 private fun KClass<*>.isNullable(): Boolean = starProjectedType.isMarkedNullable
@@ -66,17 +66,17 @@ private fun KClass<*>.isNullable(): Boolean = starProjectedType.isMarkedNullable
  * @return the corresponding [ClassDesc].
  */
 fun nullableClassDesc(klass: KClass<*>): ClassDesc = when (klass) {
-	Byte::class -> CD_Byte
-	Short::class -> CD_Short
-	Int::class -> CD_Integer
-	Long::class -> CD_Long
-	Float::class -> CD_Float
-	Double::class -> CD_Double
-	Char::class -> CD_Character
-	Boolean::class -> CD_Boolean
-	Unit::class -> CD_Void
-	String::class -> CD_String
-	else -> klass.java.describeConstable().orElseThrow()
+    Byte::class -> CD_Byte
+    Short::class -> CD_Short
+    Int::class -> CD_Integer
+    Long::class -> CD_Long
+    Float::class -> CD_Float
+    Double::class -> CD_Double
+    Char::class -> CD_Character
+    Boolean::class -> CD_Boolean
+    Unit::class -> CD_Void
+    String::class -> CD_String
+    else -> klass.java.describeConstable().orElseThrow()
 }
 
 /**
@@ -88,10 +88,10 @@ fun nullableClassDesc(klass: KClass<*>): ClassDesc = when (klass) {
  * @return the corresponding [ClassDesc].
  */
 fun classDesc(kParameter: KType): ClassDesc {
-	val kClass = kParameter.jvmErasure
+    val kClass = kParameter.jvmErasure
 
-	return if (!kParameter.isMarkedNullable) classDesc(kClass)
-	else nullableClassDesc(kClass)
+    return if (!kParameter.isMarkedNullable) classDesc(kClass)
+    else nullableClassDesc(kClass)
 }
 
 /**
@@ -103,3 +103,25 @@ fun classDesc(kParameter: KType): ClassDesc {
  * @return the corresponding [ClassDesc].
  */
 inline fun <reified T> classDesc(): ClassDesc = classDesc(T::class)
+
+inline fun <reified T : Any> klassDescOf(): KlassDesc<T> =
+    KlassDesc(classDesc<T>(), T::class)
+
+@Suppress("UNCHECKED_CAST")
+fun <T : Any> ClassDesc.toKlassDesc(): KlassDesc<T> {
+    return when (this) {
+        CD_byte -> KlassDesc(this, Byte::class as KClass<T>)
+        CD_short -> KlassDesc(this, Short::class as KClass<T>)
+        CD_int -> KlassDesc(this, Int::class as KClass<T>)
+        CD_long -> KlassDesc(this, Long::class as KClass<T>)
+        CD_float -> KlassDesc(this, Float::class as KClass<T>)
+        CD_double -> KlassDesc(this, Double::class as KClass<T>)
+        CD_char -> KlassDesc(this, Char::class as KClass<T>)
+        CD_boolean -> KlassDesc(this, Boolean::class as KClass<T>)
+        CD_void -> KlassDesc(this, Unit::class as KClass<T>)
+        else -> {
+            val kClass = Class.forName(this.toString()).kotlin as KClass<T>
+            KlassDesc(this, kClass)
+        }
+    }
+}

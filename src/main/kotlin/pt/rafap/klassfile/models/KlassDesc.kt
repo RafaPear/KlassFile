@@ -3,14 +3,30 @@ package pt.rafap.klassfile.models
 import pt.rafap.klassfile.utils.classDesc
 import java.lang.constant.ClassDesc
 import kotlin.reflect.KClass
+import kotlin.reflect.KType
 
-data class KlassDesc<T: Any>(
-	val classDesc: ClassDesc,
-	val kClass: KClass<T>?,
+@Suppress("UNCHECKED_CAST")
+data class KlassDesc<T : Any>(
+    val classDesc: ClassDesc,
+    val kClass: KClass<T>,
 ) {
-	companion object {
-		inline fun <reified T: Any> withType(): KlassDesc<T> =
-			KlassDesc(classDesc<T>(), T::class)
+    constructor(type: KType) : this(
+        classDesc(type),
+        type.classifier as? KClass<T> ?: Any::class as KClass<T>
+    )
 
-	}
+    constructor(type: Class<*>) : this(classDesc(type), type.kotlin as KClass<T>)
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is KlassDesc<*>) return false
+
+        if (classDesc != other.classDesc) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return classDesc.hashCode()
+    }
 }

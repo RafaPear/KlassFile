@@ -1,55 +1,97 @@
 package pt.rafap.klassfile
 
-import pt.rafap.klassfile.utils.classDesc
 import java.io.PrintStream
 
-interface NumberCenas {
-    fun printNumber()
-}
-
-// TODO:
-// method<Int>() {
-//    val a by parameter<Int>() // ISTO
-//    val b by parameter<Int>()
-//
-//    code { // ISTO
-//        iload(a)
-//        iload(b)
-//        iadd()
-//        ireturn()
-//    }
-//}
-
 fun main() {
-    KlassFileBuilder.klass("ultra") {
-        inherit<NumberCenas>()
+    val klass = KlassFileBuilder.klass<Runnable>("Stress") {
 
-        access {
-            public()
-        }
+        access { public() }
 
-        val number by field<Int>()
+        val intField by field<Int> { public() }
+        val strField by field<String> { private() }
 
-        val getNumber by getter(number)
-        val setNumber by setter(number)
+        val getInt by getter(intField)
+        val setInt by setter(intField)
 
         constructor {
-            defaultConstructor()
-            aload(0)
-            ldc(42)
-            setNumber()
-            return_()
+            access { public() }
+
+            code {
+                defaultCtor()
+
+                load(receiver)
+                ldc(123)
+                setInt()
+
+                ret()
+            }
         }
 
-        method("printNumber") {
-            getstatic<System>("out")
+        method<Unit>("run") {
+            access { public() }
 
-            aload(0)
-            getNumber()
+            code {
+                getStatic<System, PrintStream>("out")
 
-            invokevirtual<PrintStream>("println", args = arrayOf(classDesc<Int>()))
-            return_()
+                load(receiver)
+                getInt()
+
+                val println by findMethod<PrintStream, Unit> {
+                    param<Int>()
+                }
+
+                invokeMethod(println)
+
+                ret()
+            }
         }
 
-    }.writeAndGetInstance<NumberCenas>().printNumber()
+        method<Int>("math") {
+            val a by parameter<Int>()
+            val b by parameter<Int>()
+
+            access { public() }
+
+            code {
+                a + b
+                ret()
+            }
+        }
+
+        method<String>("string") {
+            access { public() }
+
+            code {
+                ldc("Hello")
+                ret()
+            }
+        }
+
+        method<Long>("longValue") {
+            access { public() }
+
+            code {
+                ldc(42L)
+                ret()
+            }
+        }
+
+        method<Double>("doubleValue") {
+            access { public() }
+
+            code {
+                ldc(3.14)
+                ret()
+            }
+        }
+
+        method<Float>("floatValue") {
+            access { public() }
+
+            code {
+                ldc(2.5f)
+                ret()
+            }
+        }
+    }.writeAndGetInstance().run()
 }

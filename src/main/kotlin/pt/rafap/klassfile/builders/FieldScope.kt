@@ -2,42 +2,43 @@ package pt.rafap.klassfile.builders
 
 import pt.rafap.klassfile.models.FieldRef
 import pt.rafap.klassfile.models.FieldRef.Companion.field
+import pt.rafap.klassfile.models.KlassDesc
 import pt.rafap.klassfile.utils.EagerDelegate
 import pt.rafap.klassfile.utils.FieldScopeDsl
+import pt.rafap.klassfile.utils.toKlassDesc
 import java.lang.classfile.ClassBuilder
-import java.lang.constant.ClassDesc
 import java.lang.constant.ConstantDescs.CD_void
 
 @FieldScopeDsl
-class FieldScope(val thisClassDesc: ClassDesc) {
-    private var fieldRefs = listOf<FieldRef<*>>()
+class FieldScope<O : Any>(val owner: KlassDesc<O>) {
+    private var fieldRefs = listOf<FieldRef<O, *>>()
 
-    private fun <T> buildFieldRef(
+    private fun <T : Any> buildFieldRef(
         name: String,
-        type: ClassDesc = CD_void,
-        access: FlagsScope.FieldFlagsScope.() -> Unit
-    ): FieldRef<T> {
-        val flags = FlagsScope.FieldFlagsScope(thisClassDesc.displayName())
+        type: KlassDesc<T> = CD_void.toKlassDesc(),
+        access: FlagsScope.FieldFlagsScope.() -> Unit,
+    ): FieldRef<O, T> {
+        val flags = FlagsScope.FieldFlagsScope(name)
             .apply { access() }
             .build()
 
-        return FieldRef(thisClassDesc, name, type, flags)
+        return FieldRef(name, owner, type, flags)
     }
 
-    fun <T> field(
+    fun <T : Any> field(
         name: String,
-        type: ClassDesc = CD_void,
+        type: KlassDesc<T> = CD_void.toKlassDesc(),
         access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
-    ): FieldRef<T> {
-        val fieldRef = buildFieldRef<T>(name, type, access)
+    ): FieldRef<O, T> {
+        val fieldRef = buildFieldRef(name, type, access)
         fieldRefs += fieldRef
         return fieldRef
     }
 
-    fun <T> field(
-        type: ClassDesc = CD_void,
+    fun <T : Any> field(
+        type: KlassDesc<T> = CD_void.toKlassDesc(),
         access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
-    ): EagerDelegate<FieldRef<T>> = EagerDelegate<FieldRef<T>> { _, property ->
+    ): EagerDelegate<FieldRef<O, T>> = EagerDelegate<FieldRef<O, T>> { _, property ->
         val name = property.name
         field(name, type, access)
     }

@@ -1,9 +1,14 @@
 package pt.rafap.klassfile.utils
 
-sealed class KlassFileError: Exception()
-class NoAccessSpecifierError(className: String) : KlassFileError() {
-    override val message: String = "No access specifier provided for class '$className'. " +
-                "Please provide one with the 'access' scope"
+import pt.rafap.klassfile.builders.CodeScope
+import pt.rafap.klassfile.models.InvokeType
+import pt.rafap.klassfile.models.MethodRef
+import kotlin.reflect.KClass
+
+sealed class KlassFileError : Exception()
+class NoAccessSpecifierError(scopeName: String) : KlassFileError() {
+    override val message: String = "No access specifier provided for '$scopeName'. " +
+            "Please provide one with the 'access' scope"
 }
 
 class AbstractInstanceError(className: String) : KlassFileError() {
@@ -32,7 +37,7 @@ class BadInheritError(inheritor: String, inherited: String) : KlassFileError() {
 }
 
 class NoParamFoundError(paramName: String) : KlassFileError() {
-    override val message: String = "The current context does not contain a '$paramName' parameter. "+
+    override val message: String = "The current context does not contain a '$paramName' parameter. " +
             "Please provide a parameter with the name '$paramName' in the current context."
 }
 
@@ -49,4 +54,46 @@ class InvalidSlotIndexError(index: Int) : KlassFileError() {
 class NestedRawBlockError : KlassFileError() {
     override val message: String = "A raw code block is being defined inside another raw code block." +
             "Please define the inner raw code block outside of the outer one."
+}
+
+class InvokeReferenceError(invokeType: InvokeType, ref: MethodRef<*, *>) : KlassFileError() {
+    override val message: String = "The method reference '${ref}' is not valid for the invoke type '$invokeType'. " +
+            "Please provide a valid method reference for the given invoke type."
+}
+
+class StackUnderflowError(codeScope: CodeScope<*, *>) : KlassFileError() {
+    init {
+        codeScope.printStack()
+    }
+
+    override val message: String = "The stack in '${codeScope.scopeName}' is empty and cannot be popped. " +
+            "Please ensure that the stack has enough elements before popping."
+}
+
+class StackTypeMismatchError(expected: KClass<*>, actual: KClass<*>, codeScope: CodeScope<*, *>) : KlassFileError() {
+    init {
+        codeScope.printStack()
+    }
+
+    override val message: String =
+        "The stack type '${actual.simpleName}' in '${codeScope.scopeName}' does not match the expected type '${expected.simpleName}'. " +
+                "Please ensure that the stack has the correct type before popping."
+}
+
+class StackNotEmptyError(codeScope: CodeScope<*, *>) : KlassFileError() {
+    init {
+        codeScope.printStack()
+    }
+
+    override val message: String = "The stack is not empty after executing '${codeScope.scopeName}'. " +
+            "Please ensure that the stack is empty before finishing the scope."
+}
+
+class NoReturnError(codeScope: CodeScope<*, *>) : KlassFileError() {
+    init {
+        codeScope.printStack()
+    }
+
+    override val message: String = "The code block '${codeScope.scopeName}' does not have a return statement. " +
+            "Please ensure that the code block has a return statement before finishing the scope."
 }

@@ -1,34 +1,22 @@
 package pt.rafap.klassfile.models
 
-import java.lang.classfile.ClassBuilder
 import java.lang.classfile.CodeBuilder
-import java.lang.constant.ClassDesc
 import java.lang.constant.MethodTypeDesc
 import java.lang.reflect.Modifier
 
-data class MethodRef(
-    val owner: ClassDesc,
+data class MethodRef<O : Any, T : Any>(
     val name: String,
-    val methodTypeDesc: MethodTypeDesc,
+    override val owner: KlassDesc<O>,
+    override val type: KlassDesc<T>,
+    val params: List<ParamRef<*>>,
     val flags: Int,
-    val isConstructor: Boolean,
+    val invokeType: InvokeType,
     val code: ((CodeBuilder) -> Unit)? = null,
-) {
-    val isStatic = flags and Modifier.STATIC != 0
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is MethodRef) return false
-
-        if (owner != other.owner) return false
-        if (name != other.name) return false
-        if (methodTypeDesc.returnType().toString() != other.methodTypeDesc.returnType().toString()) return false
-        if (methodTypeDesc.parameterList().map { it.toString() } != other.methodTypeDesc.parameterList()
-                .map { it.toString() }) return false
-        if (isConstructor != other.isConstructor) return false
-
-        return true
-    }
+) : TypedRef<O, T> {
+    val methodTypeDesc: MethodTypeDesc = MethodTypeDesc.of(
+        type.classDesc,
+        *params.map { it.type.classDesc }.toTypedArray()
+    )
 
     private fun toModifiers(): List<String> = buildList {
         when {
@@ -43,6 +31,8 @@ data class MethodRef(
     }
 
     override fun toString(): String = buildString {
+        append(invokeType.name)
+        append(" ")
 
         // Modifiers
         val modifiers = toModifiers()
@@ -50,10 +40,10 @@ data class MethodRef(
             modifiers.joinTo(this, " ", postfix = " ")
 
         // Owner
-        append(owner.displayName())
+        append(owner.classDesc.displayName())
 
         // Method Name
-        if (!isConstructor) append(".$name")
+        if (!invokeType.isSpecial()) append(".$name")
 
         // Parameters
         methodTypeDesc
@@ -62,25 +52,5 @@ data class MethodRef(
 
         append(": ")
         append(methodTypeDesc.returnType().displayName())
-    }
-
-    override fun hashCode(): Int {
-        var result = 1
-        result = 31 * result + isConstructor.hashCode()
-        result = 31 * result + owner.hashCode()
-        result = 31 * result + name.hashCode()
-        result = 31 * result + methodTypeDesc.parameterList().map { it.toString() }.hashCode()
-        result = 31 * result + methodTypeDesc.returnType().toString().hashCode()
-        return result
-    }
-
-    companion object {
-        fun ClassBuilder.method(ref: MethodRef): ClassBuilder = apply {
-            withMethod(ref.name, ref.methodTypeDesc, ref.flags) { mb ->
-                mb.withCode { cb ->
-                    ref.code?.invoke(cb)
-                }
-            }
-        }
     }
 }
