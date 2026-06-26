@@ -1,37 +1,7 @@
-# KlassFile
+package pt.rafap.klassfile
 
-> ⚠️ WORK IN PROGRESS ⚠️
+import java.io.PrintStream
 
-## Status
-
-## Status
-
-| Feature                                    | Status                                             |
-|--------------------------------------------|----------------------------------------------------|
-| Class Generation                           | ✅ Complete                                         |
-| Field Generation                           | ✅ Complete                                         |
-| Method Generation                          | ✅ Complete                                         |
-| Constructor Generation                     | ✅ Complete                                         |
-| Getter / Setter Generation                 | ✅ Complete                                         |
-| Runtime Class Loading                      | ✅ Complete                                         |
-| JVM Stack Verification                     | ✅ Complete                                         |
-| Method Resolution (Reflection)             | ✅ Complete                                         |
-| Reflection-based Method References         | ✅ Complete                                         |
-| Automatic Access Flag Validation           | ✅ Complete                                         |
-| Bytecode DSL                               | 🚧 In Progress                                     |
-| JVM Instruction Set                        | 🚧 Incomplete                                      |
-| Inheritance                                | 🚧 Supports either one superclass or one interface |
-| Control Flow (`if`, `goto`, loops, labels) | ❌ Not implemented                                  |
-| Exception Handling (`try` / `catch`)       | ❌ Not implemented                                  |
-| Local Variables API                        | 🚧 Basic support                                   |
-| Stack Map Frames                           | ❌ Not implemented                                  |
-| Generics Metadata                          | ❌ Not implemented                                  |
-| Annotations                                | ❌ Not implemented                                  |
-| Invokedynamic / Lambdas                    | ❌ Not implemented                                  |
-
-# Example
-
-```kotlin
 interface Counter {
 
     // Increments the current counter by one.
@@ -177,4 +147,3 @@ fun main() {
 
     println(counter.get()) // 0
 }
-```
