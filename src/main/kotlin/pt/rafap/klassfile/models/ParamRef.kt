@@ -8,13 +8,16 @@ package pt.rafap.klassfile.models
  */
 open class ParamRef<T : Any>(
     val name: String,
-    val type: KlassDesc<T>,
+    override val type: KlassDesc<T>,
     val order: Int,
-) {
+): TypedRef<Any, T> {
+    override val owner: KlassDesc<Any>
+        get() = error("No owner available")
     /**
      * Marker reference used for the implicit `this` parameter of instance members.
      */
     class ReceiverRef<T : Any>(type: KlassDesc<T>) : ParamRef<T>("this", type, 0)
 
+    /** Returns a compact `name: type` representation for diagnostics. */
     override fun toString() = "$name: $type"
 }

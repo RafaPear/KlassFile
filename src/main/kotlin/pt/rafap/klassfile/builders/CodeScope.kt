@@ -9,6 +9,12 @@ import kotlin.reflect.KClass
 
 
 @Suppress("UNUSED")
+/**
+ * Emits bytecode for a single method body.
+ *
+ * The scope collects low-level [CodeBuilder] instructions, tracks invocation
+ * metadata for validation, and exposes helpers for common bytecode patterns.
+ */
 @CodeScopeDsl
 class CodeScope<O : Any, R : Any>(
     val scopeName: String,
@@ -22,6 +28,7 @@ class CodeScope<O : Any, R : Any>(
     private var invocationTrace = mutableListOf<MethodRef<*, *>>()
     private var hasReturn = false
 
+    /** Prints the tracked value trace for debugging. */
     fun printStackTypes() {
         if (stackTypes.isEmpty()) return
 
@@ -31,6 +38,7 @@ class CodeScope<O : Any, R : Any>(
         }
     }
 
+    /** Prints the tracked method-invocation trace for debugging. */
     fun printInvocationTrace() {
         if (invocationTrace.isEmpty()) return
 
@@ -40,38 +48,56 @@ class CodeScope<O : Any, R : Any>(
         }
     }
 
+    /** Prints the tracked value and invocation traces for debugging. */
     fun printStack() {
         printStackTypes()
         printInvocationTrace()
     }
 
+    /** Records a value in the internal value trace when applicable. */
     private fun pushStack(stackValue: StackValue) {
         if (stackValue.type.classDesc == ConstantDescs.CD_void) return
         stackTypes.add(stackValue)
     }
 
+    /** Records a parameter value in the internal value trace. */
     private fun pushStack(ref: ParamRef<*>) {
         pushStack(StackValue.Parameter(ref))
     }
 
+    /** Records a field value in the internal value trace. */
     private fun pushStack(ref: FieldRef<*, *>) {
         pushStack(StackValue.Field(ref))
     }
 
+    /** Records a method return value in the internal value trace. */
     private fun pushStack(ref: MethodRef<*, *>) {
         pushStack(StackValue.ReturnValue(ref))
     }
 
+    /**
+     * Removes and returns the most recent tracked value.
+     *
+     * @return the most recent tracked value.
+     * @throws StackUnderflowError when no values are available.
+     */
     private fun popStack(): StackValue {
         return stackTypes.removeLastOrNull() ?: throw StackUnderflowError(this)
     }
 
+    /**
+     * Removes and returns the most recent tracked value after a type check.
+     *
+     * @param expected the expected value type.
+     * @return the removed value.
+     */
     private fun popStack(expected: KlassDesc<*>): StackValue {
         if (expected.classDesc == ConstantDescs.CD_void) error("Cannot pop stack for void type in '${scopeName}'")
         expectTop(StackValue.NewObject(expected))
         return stackTypes.removeLast()
     }
 
+    /** Applies invocation bookkeeping for a method call. */
     private fun stackInvoke(ref: MethodRef<*, *>) {
         invocationTrace.add(ref)
         for (param in ref.params.asReversed()) {
@@ -83,7 +109,13 @@ class CodeScope<O : Any, R : Any>(
         pushStack(ref)
     }
 
-    fun KlassDesc<*>.isAssignableFrom(other: KlassDesc<*>): Boolean {
+    /**
+     * Returns whether this descriptor accepts [other] by JVM assignability rules.
+     *
+     * @param other the candidate descriptor.
+     * @return `true` when [other] can be assigned to this descriptor.
+     */
+    private fun KlassDesc<*>.isAssignableFrom(other: KlassDesc<*>): Boolean {
         if (classDesc == other.classDesc)
             return true
 
@@ -96,6 +128,7 @@ class CodeScope<O : Any, R : Any>(
         return expected.isAssignableFrom(actual)
     }
 
+    /** Validates the most recent tracked value against [expected]. */
     private fun expectTop(expected: StackValue) {
         val actual = stackTypes.lastOrNull()
             ?: throw StackUnderflowError(this)
@@ -107,6 +140,12 @@ class CodeScope<O : Any, R : Any>(
 
     private var isInsideRawBlock = false
 
+    /**
+     * Adds a raw bytecode emission block to the instruction list.
+     *
+     * @param block the low-level code emission block.
+     * @throws NestedRawBlockError when a raw block is opened from inside another raw block.
+     */
     private fun raw(block: CodeBuilder.() -> Unit) {
         if (isInsideRawBlock) throw NestedRawBlockError()
         isInsideRawBlock = true
@@ -114,11 +153,21 @@ class CodeScope<O : Any, R : Any>(
         isInsideRawBlock = false
     }
 
+    /**
+     * Emits a `new` instruction for the given type.
+     *
+     * @param type the type to instantiate.
+     */
     fun <T : Any> new(type: KlassDesc<T>) {
         raw { new_(type.classDesc) }
         pushStack(StackValue.NewObject(type))
     }
 
+    /**
+     * Emits the default constructor invocation for the current receiver or superclass.
+     *
+     * @throws NoConstructorError when the owning type cannot be constructed.
+     */
     fun defaultCtor() {
         loadReceiver()
         val ownerKClass = owner.kClass
@@ -131,6 +180,7 @@ class CodeScope<O : Any, R : Any>(
         } else throw NoConstructorError(ownerKClass.simpleName ?: "Unknown")
     }
 
+    /** Emits the appropriate return instruction for the declared return type. */
     fun ret() {
         hasReturn = true
         if (type.classDesc != klassDescOf<Unit>().classDesc)
@@ -148,9 +198,22 @@ class CodeScope<O : Any, R : Any>(
         }
     }
 
+    /**
+     * Resolves a parameter by local slot index.
+     *
+     * @param slot the local slot index.
+     * @return the matching parameter reference.
+     * @throws InvalidSlotIndexError if no parameter is mapped to [slot].
+     */
     private fun getParam(slot: Int) = params.firstOrNull { it.order == slot }
         ?: throw InvalidSlotIndexError(slot)
 
+    /**
+     * Loads the value stored in a local slot.
+     *
+     * @param slot the local slot index.
+     * @throws InvalidSlotIndexError if the slot does not exist.
+     */
     fun load(slot: Int) {
         val param = getParam(slot)
         raw {
@@ -165,12 +228,23 @@ class CodeScope<O : Any, R : Any>(
         pushStack(param)
     }
 
+    /**
+     * Loads the implicit receiver parameter.
+     *
+     * @throws NoParamFoundError if the current scope does not define a receiver.
+     */
     fun loadReceiver() {
         val param = params.firstOrNull { it is ParamRef.ReceiverRef<*> }
             ?: throw NoParamFoundError("receiver")
         load(param.order)
     }
 
+    /**
+     * Stores a value into a local slot.
+     *
+     * @param slot the local slot index.
+     * @throws InvalidSlotIndexError if the slot does not exist.
+     */
     fun store(slot: Int) {
         val param = getParam(slot)
         popStack(param.type)
@@ -186,11 +260,20 @@ class CodeScope<O : Any, R : Any>(
         }
     }
 
+    /** Loads a local slot by reference. */
     inline fun <reified T : ParamRef<*>> load(ref: T) = load(ref.order)
 
 
+    /** Stores a value into a local slot by reference. */
     inline fun <reified T : ParamRef<*>> store(ref: T) = store(ref.order)
 
+    /**
+     * Increments an integer local slot in place.
+     *
+     * @param slot the local slot index.
+     * @param value the amount to add.
+     * @throws UnsupportedOperationException if the slot is not backed by an `Int`.
+     */
     fun inc(slot: Int, value: Int) {
         val param = getParam(slot)
         if (param.type.classDesc != ConstantDescs.CD_int) {
@@ -200,10 +283,18 @@ class CodeScope<O : Any, R : Any>(
         raw { iinc(slot, value) }
     }
 
-    inline fun <reified T : ParamRef<*>> inc(ref: T, value: Int = 1) {
+    /** Increments an integer parameter or slot in place. */
+    inline fun <reified T : ParamRef<*>> inc(ref: T, value: Int = 1) =
         inc(ref.order, value)
-    }
 
+
+    /**
+     * Decrements an integer local slot in place.
+     *
+     * @param slot the local slot index.
+     * @param value the amount to subtract.
+     * @throws UnsupportedOperationException if the slot is not backed by an `Int`.
+     */
     fun dec(slot: Int, value: Int) {
         val param = getParam(slot)
         if (param.type.classDesc != ConstantDescs.CD_int) {
@@ -213,10 +304,17 @@ class CodeScope<O : Any, R : Any>(
         raw { iinc(slot, -value) }
     }
 
+    /** Decrements an integer parameter or slot in place. */
     inline fun <reified T : ParamRef<*>> dec(ref: T, value: Int) {
         dec(ref.order, value)
     }
 
+    /**
+     * Adds two numeric values.
+     *
+     * @throws StackTypeMismatchError if the operand types differ.
+     * @throws UnsupportedOperationException if the operand type is not supported.
+     */
     fun add() {
         val top = popStack()
         val topType = top.type.kClass
@@ -237,14 +335,35 @@ class CodeScope<O : Any, R : Any>(
         pushStack(second)
     }
 
-    fun add(a: ParamRef<*>, b: ParamRef<*>) {
-        load(a)
-        load(b)
+    /**
+     * Loads a value from either a parameter or field reference.
+     *
+     * @param ref the reference to load.
+     */
+    fun loadRef(ref: TypedRef<*, *>) {
+        when (ref) {
+            is ParamRef<*> -> load(ref)
+            is FieldRef<*, *> -> {
+                loadReceiver()
+                getField(ref)
+            }
+            else -> throw UnsupportedOperationException("Unsupported TypedRef type: ${ref::class.simpleName}")
+        }
+    }
+
+    /** Loads two values and adds them. */
+    fun add(a: TypedRef<*, *>, b: TypedRef<*, *>) {
+        loadRef(a)
+        loadRef(b)
         add()
     }
 
-    operator fun <T : Any> ParamRef<T>.plus(ref: ParamRef<T>) = add(this, ref)
-
+    /**
+     * Subtracts two numeric values.
+     *
+     * @throws StackTypeMismatchError if the operand types differ.
+     * @throws UnsupportedOperationException if the operand type is not supported.
+     */
     fun sub() {
         val top = popStack()
         val topType = top.type.kClass
@@ -266,14 +385,19 @@ class CodeScope<O : Any, R : Any>(
         pushStack(second)
     }
 
-    fun sub(a: ParamRef<*>, b: ParamRef<*>) {
-        load(a)
-        load(b)
+    /** Loads two values and subtracts them. */
+    fun sub(a: TypedRef<*, *>, b: TypedRef<*, *>) {
+        loadRef(a)
+        loadRef(b)
         sub()
     }
 
-    operator fun <T : Any> ParamRef<T>.minus(ref: ParamRef<T>) = sub(this, ref)
-
+    /**
+     * Multiplies two numeric values.
+     *
+     * @throws StackTypeMismatchError if the operand types differ.
+     * @throws UnsupportedOperationException if the operand type is not supported.
+     */
     fun mul() {
         val top = popStack()
         val topType = top.type.kClass
@@ -295,14 +419,22 @@ class CodeScope<O : Any, R : Any>(
         pushStack(second)
     }
 
-    fun mul(a: ParamRef<*>, b: ParamRef<*>) {
-        load(a)
-        load(b)
+    /** Loads two values and multiplies them
+     *
+     *
+     * */
+    fun mul(a: TypedRef<*, *>, b: TypedRef<*, *>) {
+        loadRef(a)
+        loadRef(b)
         mul()
     }
 
-    operator fun <T : Any> ParamRef<T>.times(ref: ParamRef<T>) = mul(this, ref)
-
+    /**
+     * Divides two numeric values.
+     *
+     * @throws StackTypeMismatchError if the operand types differ.
+     * @throws UnsupportedOperationException if the operand type is not supported.
+     */
     fun div() {
         val top = popStack()
         val topType = top.type.kClass
@@ -324,12 +456,19 @@ class CodeScope<O : Any, R : Any>(
         pushStack(second)
     }
 
-    fun div(a: ParamRef<*>, b: ParamRef<*>) {
-        load(a)
-        load(b)
+    /** Loads two values and divides them. */
+    fun div(a: TypedRef<*,*>, b: TypedRef<*,*>) {
+        loadRef(a)
+        loadRef(b)
         div()
     }
 
+    /**
+     * Loads a constant using an explicit Kotlin type.
+     *
+     * @param constant the value to load, or `null` for a class literal.
+     * @param kClass the Kotlin type associated with the value.
+     */
     fun <T : Any> ldc(constant: T? = null, kClass: KClass<T>) {
         raw {
             when (constant) {
@@ -345,22 +484,32 @@ class CodeScope<O : Any, R : Any>(
         pushStack(StackValue.Constant(KlassDesc(kClass), constant))
     }
 
+    /** Emits `aconst_null`. */
     fun nullValue() {
         raw { aconst_null() }
         pushStack(StackValue.Null())
     }
 
     /**
-     * Loads a constant value onto the operand stack via the constant pool.
+     * Loads a constant through the constant pool.
      *
-     * Supported values are [String], [Int], [Long], [Float], and [Double]. Any other type is rejected.
+     * Supported values are [String], [Int], [Long], [Float], and [Double]. Any
+     * other type is treated as a class literal.
      *
-     * @param T the constant type.
      * @param constant the constant value to load.
      * @throws IllegalArgumentException if the type of [constant] is not supported.
      */
     inline fun <reified T : Any> ldc(constant: T? = null) = ldc(constant, T::class)
 
+    /**
+     * Resolves a method reference using an explicit owner and return type.
+     *
+     * @param name the method name to resolve.
+     * @param owner the class that owns the method.
+     * @param returnType the expected return type.
+     * @param builder additional parameter metadata used for overload resolution.
+     * @return the resolved method reference.
+     */
     fun <O : Any, R : Any> findMethod(
         name: String,
         owner: KlassDesc<O>,
@@ -371,6 +520,7 @@ class CodeScope<O : Any, R : Any>(
         return resolveMethod(name, owner, returnType, *params)
     }
 
+    /** Lazily resolves a method reference using the current property name when omitted. */
     inline fun <reified O : Any, reified R : Any> findMethod(
         name: String? = null,
         noinline builder: ParameterScope.() -> Unit,
@@ -378,11 +528,24 @@ class CodeScope<O : Any, R : Any>(
         findMethod(name ?: property.name, klassDescOf<O>(), klassDescOf<R>(), builder)
     }
 
+    /**
+     * Ensures a method reference matches the expected invocation kind.
+     *
+     * @param expected the required invocation type.
+     * @param ref the method reference to validate.
+     * @throws InvokeReferenceError if invocation kinds differ.
+     */
     private fun assertInvokeType(expected: InvokeType, ref: MethodRef<*, *>) {
         if (expected != ref.invokeType)
             throw InvokeReferenceError(expected, ref)
     }
 
+    /**
+     * Emits an `invokevirtual` call for the given method reference.
+     *
+     * @param ref the method reference to invoke.
+     * @throws InvokeReferenceError if the reference does not use the expected invocation kind.
+     */
     fun invokeVirtual(ref: MethodRef<*, *>) {
         assertInvokeType(InvokeType.VIRTUAL, ref)
         stackInvoke(ref)
@@ -390,6 +553,7 @@ class CodeScope<O : Any, R : Any>(
         raw { invokevirtual(ref.owner.classDesc, ref.name, ref.methodTypeDesc) }
     }
 
+    /** Emits an `invokeinterface` call for the given method reference. */
     fun invokeInterface(ref: MethodRef<*, *>) {
         assertInvokeType(InvokeType.INTERFACE, ref)
         stackInvoke(ref)
@@ -397,6 +561,7 @@ class CodeScope<O : Any, R : Any>(
         raw { invokeinterface(ref.owner.classDesc, ref.name, ref.methodTypeDesc) }
     }
 
+    /** Emits an `invokestatic` call for the given method reference. */
     fun invokeStatic(ref: MethodRef<*, *>) {
         assertInvokeType(InvokeType.STATIC, ref)
         stackInvoke(ref)
@@ -404,6 +569,7 @@ class CodeScope<O : Any, R : Any>(
         raw { invokestatic(ref.owner.classDesc, ref.name, ref.methodTypeDesc) }
     }
 
+    /** Emits an `invokespecial` call for the given method reference. */
     fun invokeSpecial(ref: MethodRef<*, *>) {
         assertInvokeType(InvokeType.SPECIAL, ref)
         stackInvoke(ref)
@@ -411,6 +577,12 @@ class CodeScope<O : Any, R : Any>(
         raw { invokespecial(ref.owner.classDesc, ref.name, ref.methodTypeDesc) }
     }
 
+    /**
+     * Instantiates a type and calls its constructor.
+     *
+     * @param owner the type to instantiate.
+     * @param builder parameter metadata used to resolve the constructor.
+     */
     fun <O : Any> instantiate(
         owner: KlassDesc<O>,
         builder: ParameterScope.() -> Unit = {},
@@ -421,12 +593,19 @@ class CodeScope<O : Any, R : Any>(
         invokeSpecial(ref)
     }
 
+    /** Instantiates a reified type and calls its constructor. */
     inline fun <reified O : Any> instantiate(
         noinline builder: ParameterScope.() -> Unit = {},
     ) {
         instantiate(klassDescOf<O>(), builder)
     }
 
+    /**
+     * Instantiates a value and stores it directly into the referenced field.
+     *
+     * @param fieldRef the field to initialize.
+     * @param builder parameter metadata used to resolve the constructor.
+     */
     inline fun <reified T : Any> instanciateField(
         fieldRef: FieldRef<*, T>,
         noinline builder: ParameterScope.() -> Unit,
@@ -443,7 +622,7 @@ class CodeScope<O : Any, R : Any>(
      * Invokes a method using a [MethodRef] and chooses the opcode from the reference metadata.
      *
      * Static members use [invokeStatic], constructors and private methods use [invokeSpecial], and all remaining
-     * members use [invokevirtual]. When the reference targets the class currently being built, `this` is loaded before
+     * members use `invokevirtual`. When the reference targets the class currently being built, `this` is loaded before
      * dispatching the invocation.
      *
      * @param methodRef the method reference to invoke.
@@ -457,6 +636,12 @@ class CodeScope<O : Any, R : Any>(
         }
     }
 
+    /**
+     * Invokes a method by name.
+     *
+     * @param name the method name, or `null` to use the backing property name.
+     * @param builder additional parameter metadata used for overload resolution.
+     */
     inline fun <reified O : Any, reified R : Any> invokeMethod(
         name: String,
         noinline builder: ParameterScope.() -> Unit = {},
@@ -472,68 +657,74 @@ class CodeScope<O : Any, R : Any>(
         }
     }
 
+    /** Replays a method invocation using the reference's own dispatch kind. */
     operator fun MethodRef<*, *>.invoke() {
         invokeMethod(this)
     }
 
+    /**
+     * Emits a `getstatic` instruction.
+     *
+     * @param name the field name.
+     * @param owner the class that owns the field.
+     * @param type the field type.
+     */
     fun getStatic(name: String, owner: KlassDesc<*>, type: KlassDesc<*>) {
         raw { getstatic(owner.classDesc, name, type.classDesc) }
         pushStack(StackValue.Field(FieldRef(name, owner, type, flags = ACC_STATIC)))
     }
 
+    /**
+     * Emits `getstatic` using reified owner and field type parameters.
+     *
+     * @param name the field name.
+     */
     inline fun <reified O : Any, reified T : Any> getStatic(name: String) =
         getStatic(name, klassDescOf<O>(), klassDescOf<T>())
 
+    /** Emits `getstatic` from an existing field reference. */
     fun getStatic(ref: FieldRef<*, *>) = getStatic(ref.name, ref.owner, ref.type)
 
+    /** Emits a `getfield` instruction. */
     fun getField(name: String, owner: KlassDesc<*>, type: KlassDesc<*>) {
         popStack(owner)
         raw { getfield(owner.classDesc, name, type.classDesc) }
         pushStack(StackValue.Field(FieldRef(name, owner, type, flags = 0)))
     }
 
+    /** Loads either a static or instance field based on the reference metadata. */
     fun getField(ref: FieldRef<*, *>) {
         if (ref.isStatic) getStatic(ref)
         else getField(ref.name, ref.owner, ref.type)
     }
 
-    /**
-     * Writes the stack top into a static field referenced by a [FieldRef].
-     *
-     * @param ref the static field reference to write.
-     * @return this [CodeBuilder] for chaining.
-     */
+    /** Emits a `putstatic` instruction for the given field reference. */
     fun putStatic(ref: FieldRef<*, *>) {
         popStack(ref.type)
         raw { putstatic(ref.owner.classDesc, ref.name, ref.type.classDesc) }
     }
 
+    /** Emits a `putfield` instruction. */
     fun putField(name: String, owner: KlassDesc<*>, type: KlassDesc<*>) {
         popStack(type)
         popStack(owner)
         raw { putfield(owner.classDesc, name, type.classDesc) }
     }
 
-    /**
-     * Writes the stack top into a field referenced by a [FieldRef].
-     *
-     * The caller is responsible for ensuring that the receiver object and value are already on the operand stack in
-     * the order expected by `putfield`.
-     *
-     * @param ref the field reference to write.
-     * @return this [CodeBuilder] for chaining.
-     */
+    /** Emits `putfield` or `putstatic` depending on the field metadata. */
     fun putField(ref: FieldRef<*, *>) {
         if (ref.isStatic) putStatic(ref)
         else putField(ref.name, ref.owner, ref.type)
     }
 
+    /** Loads the receiver, evaluates the value block, and writes the result to the field. */
     fun putThisField(ref: FieldRef<*, *>, valueBuilder: () -> Unit) {
         loadReceiver()
         valueBuilder()
         putField(ref)
     }
 
+    /** Emits `pop`. */
     fun pop() {
         val top = popStack()
 
@@ -543,6 +734,7 @@ class CodeScope<O : Any, R : Any>(
         raw { pop() }
     }
 
+    /** Emits `pop2`. */
     fun pop2() {
         val top = popStack()
 
@@ -559,6 +751,7 @@ class CodeScope<O : Any, R : Any>(
         raw { pop2() }
     }
 
+    /** Emits `dup`. */
     fun dup() {
         val top = popStack()
 
@@ -571,6 +764,7 @@ class CodeScope<O : Any, R : Any>(
         pushStack(top)
     }
 
+    /** Emits `dup_x1`. */
     fun dupX1() {
         val v1 = popStack()
         val v2 = popStack()
@@ -585,6 +779,7 @@ class CodeScope<O : Any, R : Any>(
         pushStack(v1)
     }
 
+    /** Emits `dup_x2`. */
     fun dupX2() {
         val v1 = popStack()
 
@@ -615,6 +810,7 @@ class CodeScope<O : Any, R : Any>(
         pushStack(v1)
     }
 
+    /** Emits `dup2`. */
     fun dup2() {
         val v1 = popStack()
 
@@ -639,6 +835,7 @@ class CodeScope<O : Any, R : Any>(
         pushStack(v1)
     }
 
+    /** Emits `dup2_x1`. */
     fun dup2X1() {
         val v1 = popStack()
 
@@ -671,6 +868,7 @@ class CodeScope<O : Any, R : Any>(
         pushStack(v1)
     }
 
+    /** Emits `dup2_x2`. */
     fun dup2X2() {
         val v1 = popStack()
 
@@ -734,6 +932,7 @@ class CodeScope<O : Any, R : Any>(
         }
     }
 
+    /** Emits `swap`. */
     fun swap() {
         val v1 = popStack()
         val v2 = popStack()
@@ -747,6 +946,13 @@ class CodeScope<O : Any, R : Any>(
         pushStack(v2)
     }
 
+    /**
+     * Finalizes the code block and writes the collected instructions to [db].
+     *
+     * @param db the code builder receiving the emitted instructions.
+     * @throws StackNotEmptyError if there are unresolved values left over.
+     * @throws NoReturnError if no return instruction was emitted.
+     */
     fun build(db: CodeBuilder) {
         if (stackTypes.isNotEmpty()) {
             throw StackNotEmptyError(this)

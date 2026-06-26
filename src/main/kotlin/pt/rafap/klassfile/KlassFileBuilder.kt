@@ -1,6 +1,5 @@
 package pt.rafap.klassfile
 
-import com.sun.tools.javac.tree.TreeInfo.flags
 import pt.rafap.klassfile.builders.FieldScope
 import pt.rafap.klassfile.builders.FlagsScope
 import pt.rafap.klassfile.builders.MethodScope
@@ -11,10 +10,9 @@ import pt.rafap.klassfile.models.MethodRef
 import pt.rafap.klassfile.utils.*
 import java.lang.classfile.ClassFile
 import java.lang.classfile.ClassFile.ACC_PUBLIC
-import java.lang.classfile.ClassFile.ACC_STATIC
 import java.lang.classfile.Interfaces
 import java.lang.constant.ClassDesc
-import java.lang.constant.ConstantDescs.*
+import java.lang.constant.ConstantDescs.INIT_NAME
 import java.lang.reflect.Modifier
 import kotlin.jvm.optionals.getOrNull
 import kotlin.reflect.KClass
@@ -35,8 +33,10 @@ class KlassFileBuilder<O : Any> private constructor(
     body: KlassFileBuilder<O>.() -> Unit = {},
 ) {
 
+    /** JVM descriptor for the generated class name. */
     val thisClassDesc = classDesc(name)
-    val thisKlassDesc = KlassDesc(thisClassDesc, inheritor)
+    /** Kotlin/JVM descriptor for the class being generated. */
+    val thisKlassDesc = KlassDesc(ClassDesc.of(name), inheritor)
 
     private val flagsScope = FlagsScope.ClassFlagsScope(name)
     private val fieldScope = FieldScope(thisKlassDesc)
@@ -59,8 +59,8 @@ class KlassFileBuilder<O : Any> private constructor(
      * Registers a field in the generated class with the specified type and access flags.
      *
      * The field name is inferred from the property name in the DSL context.
-     * @param T the field type.
-     * @param type the [ClassDesc] representing the field type. Defaults to [CD_void].
+     *
+     * @param type the field type descriptor.
      * @param access a lambda to configure the field's access flags using [FlagsScope.FieldFlagsScope]. Defaults to `private`.
      */
     fun <T : Any> field(
@@ -68,10 +68,12 @@ class KlassFileBuilder<O : Any> private constructor(
         access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
     ): EagerDelegate<FieldRef<O, T>> = fieldScope.field(type, access)
 
+    /** Adds a delegated field using a reified Kotlin type. */
     inline fun <reified T : Any> field(
         noinline access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
     ) = field(klassDescOf<T>(), access)
 
+    /** Adds a method with an explicit name and type descriptor. */
     fun <R : Any> method(
         name: String,
         type: KlassDesc<R>,
@@ -83,12 +85,14 @@ class KlassFileBuilder<O : Any> private constructor(
         return methodRef
     }
 
+    /** Adds a method with an explicit name and a reified return type. */
     inline fun <reified R : Any> method(
         name: String,
         invokeType: InvokeType = InvokeType.VIRTUAL,
         noinline builder: MethodScope<O, R>.() -> Unit,
     ) = method(name, klassDescOf<R>(), invokeType, builder)
 
+    /** Adds a delegated method whose name is inferred from the backing property. */
     fun <R : Any> method(
         type: KlassDesc<R>,
         invokeType: InvokeType = InvokeType.VIRTUAL,
@@ -97,6 +101,7 @@ class KlassFileBuilder<O : Any> private constructor(
         method(property.name, type, invokeType, builder)
     }
 
+    /** Adds a delegated method using a reified return type. */
     inline fun <reified R : Any> method(
         invokeType: InvokeType = InvokeType.VIRTUAL,
         noinline builder: MethodScope<O, R>.() -> Unit,
@@ -105,10 +110,10 @@ class KlassFileBuilder<O : Any> private constructor(
     /**
      * Declares a constructor for the generated class.
      *
-     * If [flags] includes [ACC_STATIC], the generated member is named [CLASS_INIT_NAME] instead of [INIT_NAME],
-     * effectively creating a class initializer.
+     * When no body is provided, the generated constructor simply invokes the
+     * default superclass constructor and returns.
      *
-     * @param builder the constructor body. By default, it invokes the superclass constructor and returns.
+     * @param builder the constructor body.
      * @return a [MethodRef] describing the generated member.
      */
     fun constructor(
@@ -118,14 +123,17 @@ class KlassFileBuilder<O : Any> private constructor(
         return method(INIT_NAME, klassDescOf<Unit>(), InvokeType.SPECIAL, builder = builder)
     }
 
+    /** Generates a conventional getter name for a field reference. */
     fun FieldRef<*, *>.genGetterName(): String {
         return "get" + name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
 
+    /** Generates a conventional setter name for a field reference. */
     fun FieldRef<*, *>.genSetterName(): String {
         return "set" + name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
 
+    /** Creates a getter method that reads the provided field. */
     fun <T : Any> getter(
         name: String,
         field: FieldRef<O, T>,
@@ -144,6 +152,7 @@ class KlassFileBuilder<O : Any> private constructor(
         }
     }
 
+    /** Adds a delegated getter whose name is derived from the field name. */
     inline fun <reified T : Any> getter(
         field: FieldRef<O, T>,
         noinline access: FlagsScope.MethodFlagsScope.() -> Unit = { public() },
@@ -151,6 +160,7 @@ class KlassFileBuilder<O : Any> private constructor(
         getter(field.genGetterName(), field, access)
     }
 
+    /** Creates a setter method that writes the provided field. */
     fun <T : Any> setter(
         name: String,
         field: FieldRef<O, T>,
@@ -166,6 +176,7 @@ class KlassFileBuilder<O : Any> private constructor(
         }
     }
 
+    /** Adds a delegated setter whose name is derived from the field name. */
     inline fun <reified T : Any> setter(
         field: FieldRef<O, T>,
         noinline access: FlagsScope.MethodFlagsScope.() -> Unit = { public() },
@@ -189,7 +200,6 @@ class KlassFileBuilder<O : Any> private constructor(
          *
          * The class is written under the builder's [name] before being loaded.
          *
-         * @param T the desired Kotlin type for the returned class.
          * @return the loaded [KClass] instance.
          */
         fun writeAndGetClass(): KClass<O> = writeAndGetClass(name, bytes)
@@ -200,7 +210,6 @@ class KlassFileBuilder<O : Any> private constructor(
          * This requires the generated class to expose a public no-argument constructor compatible with
          * [createInstance].
          *
-         * @param T the expected type of the generated instance.
          * @return a new instance of the generated class.
          */
         fun writeAndGetInstance(): O {
@@ -223,7 +232,6 @@ class KlassFileBuilder<O : Any> private constructor(
          *
          * This uses the builder's [name] and does not persist the generated bytes.
          *
-         * @param T the expected type of the generated class.
          * @return the loaded class reference.
          */
         inline fun <reified T : Any> load() = loadClass<T>(name)
@@ -243,6 +251,11 @@ class KlassFileBuilder<O : Any> private constructor(
     fun klass(): Klass = Klass()
 
 
+    /**
+     * Ensures every abstract method from the inherited type is implemented by the DSL.
+     *
+     * @throws IllegalStateException when one or more required methods are missing.
+     */
     private fun checkMethodImplementations() {
         val kClass = thisKlassDesc.kClass
 
@@ -272,6 +285,11 @@ class KlassFileBuilder<O : Any> private constructor(
         }
     }
 
+    /**
+     * Builds and returns the final class byte array.
+     *
+     * @return the generated class bytes.
+     */
     private fun build(): ByteArray {
         checkMethodImplementations()
 
@@ -293,11 +311,11 @@ class KlassFileBuilder<O : Any> private constructor(
 
             if (thisKClass.java.isInterface) clb.withInterfaces(Interfaces.ofSymbols(desc).interfaces())
             else if (thisKClass.isAbstract) clb.withSuperclass(desc)
-            else throw BadInheritError(thisClassDesc.displayName(), desc.displayName())
+            else throw BadInheritError(thisKlassDesc.classDesc.displayName(), desc.displayName())
 
             fieldScope.build(clb)
             methodRefs.forEach { m ->
-                val fn = m.code ?: return@forEach
+                val fn = m.code ?: throw NoCodeBlockDefinedError(m)
                 clb.withMethod(m.name, m.methodTypeDesc, m.flags) { mb ->
                     mb.withCode { cb -> fn(cb) }
                 }
@@ -307,11 +325,12 @@ class KlassFileBuilder<O : Any> private constructor(
 
     companion object {
         /**
-         * Creates a [Klass] by applying the provided DSL block to a new [KlassFileBuilder].
+         * Creates a generated class by applying the provided DSL block to a new builder.
          *
          * This is the recommended entry point when constructing a generated class from scratch.
          *
          * @param name the binary name of the class to generate.
+         * @param inheritor the Kotlin class used to derive the generated type metadata.
          * @param builder the DSL block used to configure the builder.
          * @return the generated class wrapper.
          */
@@ -321,6 +340,7 @@ class KlassFileBuilder<O : Any> private constructor(
             builder: KlassFileBuilder<T>.() -> Unit,
         ): KlassFileBuilder<T>.Klass = KlassFileBuilder(name, inheritor).also(builder).klass()
 
+        /** Creates a generated class using a reified inheritor type. */
         inline fun <reified T : Any> klass(
             name: String,
             noinline builder: KlassFileBuilder<T>.() -> Unit,

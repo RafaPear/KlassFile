@@ -1,3 +1,5 @@
+@file:Suppress("unused")
+
 package pt.rafap.klassfile.utils
 
 import pt.rafap.klassfile.models.InvokeType
@@ -5,10 +7,7 @@ import pt.rafap.klassfile.models.KlassDesc
 import pt.rafap.klassfile.models.MethodRef
 import pt.rafap.klassfile.models.ParamRef
 import java.lang.classfile.ClassFile.ACC_PUBLIC
-import java.lang.constant.ClassDesc
-import java.lang.constant.ConstantDescs.CD_void
 import java.lang.constant.ConstantDescs.INIT_NAME
-import java.lang.constant.MethodTypeDesc
 import java.lang.reflect.Constructor
 import java.lang.reflect.Method
 import kotlin.reflect.KFunction
@@ -16,32 +15,14 @@ import kotlin.reflect.full.declaredFunctions
 import kotlin.reflect.jvm.javaConstructor
 import kotlin.reflect.jvm.javaMethod
 
-fun <O : Any, R : Any> resolveMultipleMethods(
-    name: String,
-    owner: KlassDesc<O>,
-    type: KlassDesc<R>,
-): List<MethodRef<O, R>> =
-    owner.kClass.java.methods
-        .filter { it.name == name }
-        .mapNotNull { it.toMethodRef(owner, type) }
 
 /**
- * Creates a [MethodTypeDesc] from a return type and a list of argument types.
+ * Converts a Java [Method] into a [MethodRef] using explicit owner and return types.
  *
- * This is a thin wrapper around [MethodTypeDesc.of].
- *
- * @param returnType the method return type. Defaults to [CD_void].
- * @param argTypes the method argument types, in declaration order.
- * @return the corresponding [MethodTypeDesc].
+ * @param owner the class that owns the method.
+ * @param type the expected return type.
+ * @return the converted [MethodRef].
  */
-fun methodDesc(
-    returnType: ClassDesc? = null,
-    vararg argTypes: ClassDesc,
-): MethodTypeDesc {
-    val newReturnType = returnType ?: CD_void
-    return MethodTypeDesc.of(newReturnType, *argTypes)
-}
-
 fun <O : Any, R : Any> Method.toMethodRef(
     owner: KlassDesc<O>,
     type: KlassDesc<R>,
@@ -63,9 +44,19 @@ fun <O : Any, R : Any> Method.toMethodRef(
     )
 }
 
+/** Converts a Java [Method] into a [MethodRef] using reified owner and return types. */
 inline fun <reified O : Any, reified R : Any> Method.toMethodRef() =
     toMethodRef(klassDescOf<O>(), klassDescOf<R>())
 
+/**
+ * Converts a Java [Constructor] into a constructor-style [MethodRef].
+ *
+ * Kotlin synthetic constructor markers are skipped so only real constructor
+ * parameters remain in the resulting reference.
+ *
+ * @param owner the class that owns the constructor.
+ * @return the converted [MethodRef], or `null` if the constructor only represents a synthetic marker.
+ */
 fun <O : Any, R : Any> Constructor<*>.toMethodRef(
     owner: KlassDesc<O>,
 ): MethodRef<O, R>? {
@@ -88,9 +79,17 @@ fun <O : Any, R : Any> Constructor<*>.toMethodRef(
     )
 }
 
+/** Converts a Java [Constructor] into a [MethodRef] using reified owner and return types. */
 inline fun <reified O : Any, reified R : Any> Constructor<*>.toMethodRef() =
     toMethodRef<O, R>(klassDescOf<O>())
 
+/**
+ * Converts a Kotlin [KFunction] into a [MethodRef] using explicit owner and return types.
+ *
+ * @param owner the class that owns the function.
+ * @param type the expected return type.
+ * @return the converted [MethodRef].
+ */
 fun <O : Any, R : Any> KFunction<*>.toMethodRef(
     owner: KlassDesc<O>,
     type: KlassDesc<R>,
@@ -117,54 +116,40 @@ fun <O : Any, R : Any> KFunction<*>.toMethodRef(
     )
 }
 
+/** Converts a Kotlin [KFunction] into a [MethodRef] using reified owner and return types. */
 inline fun <reified O : Any, reified R : Any> KFunction<*>.toMethodRef() =
     toMethodRef(klassDescOf<O>(), klassDescOf<R>())
 
 /**
- * Resolves a public method from the given class and converts it into a [MethodRef].
+ * Resolves a public method from the given owner and return type and converts it into a [MethodRef].
  *
  * This utility performs overload resolution in multiple stages:
  *
- * 1. Resolves all public methods with the given [name].
- * 2. If only one method exists, it is immediately returned.
- * 3. If [returnType] is provided, methods are filtered by return type.
- * 4. If [params] are provided, methods are filtered by parameter types.
- * 5. If a single method is resolved at any stage, it is returned.
- * 6. If multiple candidates remain, an ambiguity error is thrown.
+ * 1. Resolve every public method or constructor with the requested [name].
+ * 2. If only one candidate exists, return it immediately.
+ * 3. If multiple candidates remain, narrow them by the provided parameter list.
+ * 4. If a single candidate remains after filtering, return it.
+ * 5. Otherwise report the ambiguity with the remaining candidates.
  *
- * Only public methods visible through Java reflection (`kclass.java.methods`)
- * are considered.
+ * Only public members visible through Java reflection are considered.
  *
  * Example:
  * ```kotlin
  * resolveMethod(
  *     name = "println",
- *     kclass = PrintStream::class,
- *     returnType = CD_void,
- *     args = ClassDesc.of("java.lang.String")
+ *     owner = klassDescOf<PrintStream>(),
+ *     type = klassDescOf<Unit>(),
+ *     params = ParamRef("arg0", klassDescOf<String>(), 0)
  * )
  * ```
  *
- * @param name
- * Name of the method to resolve.
- *
- * @param kclass
- * Target class where the method will be searched.
- *
- * @param returnType
- * Optional expected return type used to disambiguate overloaded methods.
- *
- * @param params
- * Optional parameter types used for overload resolution.
- *
- * @return
- * A resolved [MethodRef] representing the target method.
- *
- * @throws NoSuchMethodException
- * If no public method with the given name exists in the class.
- *
- * @throws IllegalStateException
- * If multiple overloads still match after applying all resolution filters.
+ * @param name the method name to resolve.
+ * @param owner the class that owns the target member.
+ * @param type the expected return type.
+ * @param params optional parameters used to disambiguate overloads.
+ * @return a resolved [MethodRef] representing the target method.
+ * @throws NoSuchMethodException if no public member with the given name exists.
+ * @throws IllegalStateException if multiple overloads remain after filtering.
  */
 fun <O : Any, R : Any> resolveMethod(
     name: String,
@@ -185,18 +170,18 @@ fun <O : Any, R : Any> resolveMethod(
 
     // First, try to find the method by the name
 
-    val crudeKotlinMethods = kClass.declaredFunctions.mapNotNull { it.toMethodRef(owner, type) }
+    val crudeKotlinMethods = kClass.declaredFunctions.map { it.toMethodRef(owner, type) }
 
-    val crudeJavaMethods = kClass.java.methods.mapNotNull { it.toMethodRef(owner, type) }
+    val crudeJavaMethods = kClass.java.methods.map { it.toMethodRef(owner, type) }
 
-    val crudeKotlinConstructors = kClass.constructors.mapNotNull { it.toMethodRef(owner, type) }
+    val crudeKotlinConstructors = kClass.constructors.map { it.toMethodRef(owner, type) }
 
     val crudeJavaConstructors = kClass.java.declaredConstructors.mapNotNull { it.toMethodRef<O, R>(owner) }
 
     val crudeMethods = (crudeJavaMethods + crudeKotlinMethods).toSet()
     val crudeConstructors = (crudeJavaConstructors + crudeKotlinConstructors).toSet()
 
-    var methods = (crudeMethods + crudeConstructors).filter {
+    var methods: List<MethodRef<O, R>> = (crudeMethods + crudeConstructors).filter {
         it.flags and ACC_PUBLIC != 0 && it.name == name
     }
 
