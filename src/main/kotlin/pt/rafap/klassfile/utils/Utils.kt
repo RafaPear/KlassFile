@@ -1,6 +1,7 @@
 package pt.rafap.klassfile
 
 import java.io.File
+import java.lang.reflect.Modifier
 import java.net.URLClassLoader
 import kotlin.reflect.KClass
 
@@ -31,4 +32,16 @@ fun <T : Any> writeAndGetClass(
 ): KClass<T> {
     write(className, bytes)
     return loadClass(className)
+}
+
+fun toModifiers(flags: Int): List<String> = buildList {
+    when {
+        Modifier.isPublic(flags) -> add("public")
+        Modifier.isProtected(flags) -> add("protected")
+        Modifier.isPrivate(flags) -> add("private")
+    }
+    if (Modifier.isAbstract(flags)) add("abstract")
+    if (Modifier.isStatic(flags)) add("static")
+    if (Modifier.isFinal(flags)) add("final")
+    if (Modifier.isNative(flags)) add("native")
 }

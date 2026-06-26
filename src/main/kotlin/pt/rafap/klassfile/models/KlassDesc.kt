@@ -17,6 +17,8 @@ data class KlassDesc<T : Any>(
 
     constructor(type: Class<*>) : this(classDesc(type), type.kotlin as KClass<T>)
 
+    constructor(type: KClass<T>) : this(classDesc(type), type)
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is KlassDesc<*>) return false
@@ -28,5 +30,9 @@ data class KlassDesc<T : Any>(
 
     override fun hashCode(): Int {
         return classDesc.hashCode()
+    }
+
+    override fun toString(): String {
+        return classDesc.displayName()
     }
 }

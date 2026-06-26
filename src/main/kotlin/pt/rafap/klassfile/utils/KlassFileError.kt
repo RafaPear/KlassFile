@@ -3,7 +3,7 @@ package pt.rafap.klassfile.utils
 import pt.rafap.klassfile.builders.CodeScope
 import pt.rafap.klassfile.models.InvokeType
 import pt.rafap.klassfile.models.MethodRef
-import kotlin.reflect.KClass
+import pt.rafap.klassfile.models.StackValue
 
 sealed class KlassFileError : Exception()
 class NoAccessSpecifierError(scopeName: String) : KlassFileError() {
@@ -70,14 +70,15 @@ class StackUnderflowError(codeScope: CodeScope<*, *>) : KlassFileError() {
             "Please ensure that the stack has enough elements before popping."
 }
 
-class StackTypeMismatchError(expected: KClass<*>, actual: KClass<*>, codeScope: CodeScope<*, *>) : KlassFileError() {
+class StackTypeMismatchError(expected: StackValue, actual: StackValue, codeScope: CodeScope<*, *>) : KlassFileError() {
     init {
         codeScope.printStack()
     }
 
     override val message: String =
-        "The stack type '${actual.simpleName}' in '${codeScope.scopeName}' does not match the expected type '${expected.simpleName}'. " +
-                "Please ensure that the stack has the correct type before popping."
+        "The stack in '${codeScope.scopeName}' has a type mismatch. " +
+                "Expected '${expected.type.classDesc.displayName()}', but found '${actual.type.classDesc.displayName()}'. " +
+                "Please ensure that the stack has the correct types before popping."
 }
 
 class StackNotEmptyError(codeScope: CodeScope<*, *>) : KlassFileError() {

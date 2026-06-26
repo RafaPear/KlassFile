@@ -1,5 +1,6 @@
 package pt.rafap.klassfile.models
 
+import pt.rafap.klassfile.toModifiers
 import java.lang.classfile.ClassBuilder
 import java.lang.classfile.ClassFile.ACC_STATIC
 import java.lang.classfile.CodeBuilder
@@ -12,6 +13,15 @@ data class FieldRef<O : Any, T : Any>(
     val flags: Int,
 ) : TypedRef<O, T> {
     val isStatic: Boolean = flags and ACC_STATIC != 0
+
+    override fun toString() = buildString{
+        val modifiers = toModifiers(flags)
+        if (modifiers.isNotEmpty())
+            modifiers.joinTo(this, " ", postfix = " ")
+        append(owner.classDesc.displayName())
+        append(".$name: ")
+        append(type.classDesc.displayName())
+    }
 
     companion object {
         fun CodeBuilder.toFieldRefEntry(ref: FieldRef<*, *>): FieldRefEntry =
