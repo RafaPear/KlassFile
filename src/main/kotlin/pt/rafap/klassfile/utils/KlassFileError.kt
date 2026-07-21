@@ -7,7 +7,21 @@ import pt.rafap.klassfile.models.MethodRef
 import pt.rafap.klassfile.models.StackValue
 
 /** Base type for all DSL validation and bytecode generation failures. */
-sealed class KlassFileError : Exception()
+private val LIBRARY_PACKAGES = listOf(
+    "pt.rafap.klassfile",
+    "jdk.internal.classfile",
+    "java.lang.classfile"
+)
+
+abstract class KlassFileError : RuntimeException() {
+    override fun fillInStackTrace(): Throwable {
+        super.fillInStackTrace()
+        stackTrace = stackTrace
+            .filterNot { clazz -> LIBRARY_PACKAGES.any { clazz.className.startsWith(it) } }
+            .toTypedArray()
+        return this
+    }
+}
 
 /** Thrown when a scope is built without selecting an access modifier. */
 class NoAccessSpecifierError(scopeName: String) : KlassFileError() {
@@ -105,6 +119,15 @@ class StackNotEmptyError(codeScope: CodeScope<*, *>) : KlassFileError() {
 
     override val message: String = "The stack is not empty after executing '${codeScope.scopeName}'. " +
             "Please ensure that the stack is empty before finishing the scope."
+}
+
+class StackVoidTypeError(codeScope: CodeScope<*, *>) : KlassFileError() {
+    init {
+        codeScope.printStack()
+    }
+
+    override val message: String = "Cannot pop stack for void type in '${codeScope.scopeName}'. " +
+            "Please ensure that the stack has a valid type before popping."
 }
 
 /** Thrown when a code block completes without emitting a return instruction. */
