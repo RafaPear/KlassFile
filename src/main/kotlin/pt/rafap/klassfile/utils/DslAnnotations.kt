@@ -19,3 +19,7 @@ annotation class CodeScopeDsl
 /** Marks the flags DSL receiver scope. */
 @DslMarker
 annotation class FlagsScopeDsl
+
+@Target(AnnotationTarget.CLASS)
+@Retention(AnnotationRetention.RUNTIME)
+annotation class KlassFileApi

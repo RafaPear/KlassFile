@@ -26,6 +26,7 @@ import kotlin.reflect.full.createInstance
  * class representation through the `klass()` API.
  */
 @KlassFileDsl
+@KlassFileApi
 @Suppress("unused")
 class KlassFileBuilder<O : Any> private constructor(
     val name: String,
@@ -35,6 +36,7 @@ class KlassFileBuilder<O : Any> private constructor(
 
     /** JVM descriptor for the generated class name. */
     val thisClassDesc = classDesc(name)
+
     /** Kotlin/JVM descriptor for the class being generated. */
     val thisKlassDesc = KlassDesc(ClassDesc.of(name), inheritor)
 
@@ -50,10 +52,12 @@ class KlassFileBuilder<O : Any> private constructor(
 
     /////// UTILITIES ///////
 
+
     /**
      * Configures the access flags for the generated class using a [FlagsScope.ClassFlagsScope] DSL.
      */
-    fun access(builder: FlagsScope.ClassFlagsScope.() -> Unit) = flagsScope.builder()
+
+   fun access(builder: FlagsScope.ClassFlagsScope.() -> Unit) = flagsScope.builder()
 
     /**
      * Registers a field in the generated class with the specified type and access flags.
@@ -63,7 +67,8 @@ class KlassFileBuilder<O : Any> private constructor(
      * @param type the field type descriptor.
      * @param access a lambda to configure the field's access flags using [FlagsScope.FieldFlagsScope]. Defaults to `private`.
      */
-    fun <T : Any> field(
+
+   fun <T : Any> field(
         type: KlassDesc<T>,
         access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
     ): EagerDelegate<FieldRef<O, T>> = fieldScope.field(type, access)
@@ -74,7 +79,8 @@ class KlassFileBuilder<O : Any> private constructor(
     ) = field(klassDescOf<T>(), access)
 
     /** Adds a method with an explicit name and type descriptor. */
-    fun <R : Any> method(
+
+   fun <R : Any> method(
         name: String,
         type: KlassDesc<R>,
         invokeType: InvokeType = InvokeType.VIRTUAL,
@@ -93,7 +99,8 @@ class KlassFileBuilder<O : Any> private constructor(
     ) = method(name, klassDescOf<R>(), invokeType, builder)
 
     /** Adds a delegated method whose name is inferred from the backing property. */
-    fun <R : Any> method(
+
+   fun <R : Any> method(
         type: KlassDesc<R>,
         invokeType: InvokeType = InvokeType.VIRTUAL,
         builder: MethodScope<O, R>.() -> Unit,
@@ -116,7 +123,8 @@ class KlassFileBuilder<O : Any> private constructor(
      * @param builder the constructor body.
      * @return a [MethodRef] describing the generated member.
      */
-    fun constructor(
+
+   fun constructor(
         builder: MethodScope<O, Unit>.() -> Unit = { access { public() }; code { defaultCtor(); ret() } },
     ): MethodRef<O, Unit> {
         hasNoArgsConstructor = true
@@ -124,17 +132,20 @@ class KlassFileBuilder<O : Any> private constructor(
     }
 
     /** Generates a conventional getter name for a field reference. */
-    fun FieldRef<*, *>.genGetterName(): String {
+
+   fun FieldRef<*, *>.genGetterName(): String {
         return "get" + name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
 
     /** Generates a conventional setter name for a field reference. */
-    fun FieldRef<*, *>.genSetterName(): String {
+
+   fun FieldRef<*, *>.genSetterName(): String {
         return "set" + name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
 
     /** Creates a getter method that reads the provided field. */
-    fun <T : Any> getter(
+
+   fun <T : Any> getter(
         name: String,
         field: FieldRef<O, T>,
         access: FlagsScope.MethodFlagsScope.() -> Unit = { public() },
@@ -161,7 +172,8 @@ class KlassFileBuilder<O : Any> private constructor(
     }
 
     /** Creates a setter method that writes the provided field. */
-    fun <T : Any> setter(
+
+   fun <T : Any> setter(
         name: String,
         field: FieldRef<O, T>,
         access: FlagsScope.MethodFlagsScope.() -> Unit = { public() },
@@ -191,6 +203,7 @@ class KlassFileBuilder<O : Any> private constructor(
      * Instances of this class are created only after the builder has been fully configured; they expose the final
      * byte array together with helpers to write it, load it, or instantiate it.
      */
+    @KlassFileApi
     inner class Klass {
         /** Raw bytecode for the generated class. */
         val bytes: ByteArray = build()
@@ -248,7 +261,8 @@ class KlassFileBuilder<O : Any> private constructor(
      *
      * @return the generated class wrapper.
      */
-    fun klass(): Klass = Klass()
+
+   fun klass(): Klass = Klass()
 
 
     /**
@@ -323,6 +337,7 @@ class KlassFileBuilder<O : Any> private constructor(
         }
     }
 
+    @KlassFileApi
     companion object {
         /**
          * Creates a generated class by applying the provided DSL block to a new builder.
@@ -338,7 +353,8 @@ class KlassFileBuilder<O : Any> private constructor(
             name: String,
             inheritor: KClass<T>,
             builder: KlassFileBuilder<T>.() -> Unit,
-        ): KlassFileBuilder<T>.Klass = KlassFileBuilder(name, inheritor).also(builder).klass()
+        ): KlassFileBuilder<T>.Klass =
+            KlassFileBuilder(name, inheritor).apply(builder).klass()
 
         /** Creates a generated class using a reified inheritor type. */
         inline fun <reified T : Any> klass(

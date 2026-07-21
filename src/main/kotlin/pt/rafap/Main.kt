@@ -1,5 +1,6 @@
-package pt.rafap.klassfile
+package pt.rafap
 
+import pt.rafap.klassfile.utils.klassFile
 import java.io.PrintStream
 
 interface Counter {
@@ -23,7 +24,7 @@ interface Counter {
 fun main() {
 
     // Generate a concrete implementation of the Counter interface.
-    val counter = klassFile<Counter>("CounterImpl") {
+    val counter by klassFile<Counter> {
 
         // Configure the generated class.
         access { public() }
@@ -64,6 +65,7 @@ fun main() {
                 loadReceiver()
                 add(value, amount)
                 setValue()
+                ldc(0)
 
                 ret()
             }
@@ -133,17 +135,18 @@ fun main() {
             }
         }
 
-    }.writeAndGetInstance() // Build, load and instantiate the generated class.
+    }
+    val instance = counter.writeAndGetInstance() // Build, load and instantiate the generated class.
 
-    counter.increment()
-    counter.increment()
-    counter.addValue(10)
+    instance.increment()
+    instance.increment()
+    instance.addValue(10)
 
-    println(counter.get()) // 12
+    println(instance.get()) // 12
 
-    counter.print()
+    instance.print()
 
-    counter.reset()
+    instance.reset()
 
-    println(counter.get()) // 0
+    println(instance.get()) // 0
 }

@@ -14,6 +14,7 @@ import java.lang.reflect.Modifier
  * materialized into a [MethodRef] when [build] is called.
  */
 @MethodScopeDsl
+@KlassFileApi
 class MethodScope<O : Any, R : Any>(
     val name: String,
     override val owner: KlassDesc<O>,

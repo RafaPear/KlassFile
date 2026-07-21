@@ -16,6 +16,7 @@ import kotlin.reflect.KClass
  * metadata for validation, and exposes helpers for common bytecode patterns.
  */
 @CodeScopeDsl
+@KlassFileApi
 class CodeScope<O : Any, R : Any>(
     val scopeName: String,
     override val type: KlassDesc<R>,
@@ -24,118 +25,12 @@ class CodeScope<O : Any, R : Any>(
 ) : TypedRef<O, R> {
 
     private var instructions = mutableListOf<CodeBuilder.() -> Unit>()
-    private var stackTypes = mutableListOf<StackValue>()
-    private var invocationTrace = mutableListOf<MethodRef<*, *>>()
+    private var stack = Stack(this)
     private var hasReturn = false
-
-    /** Prints the tracked value trace for debugging. */
-    fun printStackTypes() {
-        if (stackTypes.isEmpty()) return
-
-        println("Current Stack Types:")
-        stackTypes.forEachIndexed { index, stackValue ->
-            println("  [${index}]: $stackValue")
-        }
-    }
-
-    /** Prints the tracked method-invocation trace for debugging. */
-    fun printInvocationTrace() {
-        if (invocationTrace.isEmpty()) return
-
-        println("Current Invocation Trace:")
-        invocationTrace.forEachIndexed { index, methodRef ->
-            println("  [${index}]: $methodRef")
-        }
-    }
 
     /** Prints the tracked value and invocation traces for debugging. */
     fun printStack() {
-        printStackTypes()
-        printInvocationTrace()
-    }
-
-    /** Records a value in the internal value trace when applicable. */
-    private fun pushStack(stackValue: StackValue) {
-        if (stackValue.type.classDesc == ConstantDescs.CD_void) return
-        stackTypes.add(stackValue)
-    }
-
-    /** Records a parameter value in the internal value trace. */
-    private fun pushStack(ref: ParamRef<*>) {
-        pushStack(StackValue.Parameter(ref))
-    }
-
-    /** Records a field value in the internal value trace. */
-    private fun pushStack(ref: FieldRef<*, *>) {
-        pushStack(StackValue.Field(ref))
-    }
-
-    /** Records a method return value in the internal value trace. */
-    private fun pushStack(ref: MethodRef<*, *>) {
-        pushStack(StackValue.ReturnValue(ref))
-    }
-
-    /**
-     * Removes and returns the most recent tracked value.
-     *
-     * @return the most recent tracked value.
-     * @throws StackUnderflowError when no values are available.
-     */
-    private fun popStack(): StackValue {
-        return stackTypes.removeLastOrNull() ?: throw StackUnderflowError(this)
-    }
-
-    /**
-     * Removes and returns the most recent tracked value after a type check.
-     *
-     * @param expected the expected value type.
-     * @return the removed value.
-     */
-    private fun popStack(expected: KlassDesc<*>): StackValue {
-        if (expected.classDesc == ConstantDescs.CD_void) error("Cannot pop stack for void type in '${scopeName}'")
-        expectTop(StackValue.NewObject(expected))
-        return stackTypes.removeLast()
-    }
-
-    /** Applies invocation bookkeeping for a method call. */
-    private fun stackInvoke(ref: MethodRef<*, *>) {
-        invocationTrace.add(ref)
-        for (param in ref.params.asReversed()) {
-            popStack(param.type)
-        }
-        if (ref.invokeType != InvokeType.STATIC)
-            popStack(ref.owner)
-
-        pushStack(ref)
-    }
-
-    /**
-     * Returns whether this descriptor accepts [other] by JVM assignability rules.
-     *
-     * @param other the candidate descriptor.
-     * @return `true` when [other] can be assigned to this descriptor.
-     */
-    private fun KlassDesc<*>.isAssignableFrom(other: KlassDesc<*>): Boolean {
-        if (classDesc == other.classDesc)
-            return true
-
-        val expected = kClass.java
-        val actual = other.kClass.java
-
-        if (expected.isPrimitive || actual.isPrimitive)
-            return false
-
-        return expected.isAssignableFrom(actual)
-    }
-
-    /** Validates the most recent tracked value against [expected]. */
-    private fun expectTop(expected: StackValue) {
-        val actual = stackTypes.lastOrNull()
-            ?: throw StackUnderflowError(this)
-
-        if (!expected.type.isAssignableFrom(actual.type)) {
-            throw StackTypeMismatchError(expected, actual, this)
-        }
+        stack.printStack()
     }
 
     private var isInsideRawBlock = false
@@ -160,7 +55,7 @@ class CodeScope<O : Any, R : Any>(
      */
     fun <T : Any> new(type: KlassDesc<T>) {
         raw { new_(type.classDesc) }
-        pushStack(StackValue.NewObject(type))
+        stack.pushStack(StackValue.NewObject(type))
     }
 
     /**
@@ -184,7 +79,7 @@ class CodeScope<O : Any, R : Any>(
     fun ret() {
         hasReturn = true
         if (type.classDesc != klassDescOf<Unit>().classDesc)
-            popStack(type)
+            stack.popStack(type)
 
         raw {
             when (type.classDesc) {
@@ -225,7 +120,7 @@ class CodeScope<O : Any, R : Any>(
                 else -> aload(slot)
             }
         }
-        pushStack(param)
+        stack.pushStack(param)
     }
 
     /**
@@ -247,7 +142,7 @@ class CodeScope<O : Any, R : Any>(
      */
     fun store(slot: Int) {
         val param = getParam(slot)
-        popStack(param.type)
+        stack.popStack(param.type)
 
         raw {
             when (param.type.classDesc) {
@@ -287,7 +182,6 @@ class CodeScope<O : Any, R : Any>(
     inline fun <reified T : ParamRef<*>> inc(ref: T, value: Int = 1) =
         inc(ref.order, value)
 
-
     /**
      * Decrements an integer local slot in place.
      *
@@ -316,9 +210,9 @@ class CodeScope<O : Any, R : Any>(
      * @throws UnsupportedOperationException if the operand type is not supported.
      */
     fun add() {
-        val top = popStack()
+        val top = stack.popStack()
         val topType = top.type.kClass
-        val second = popStack()
+        val second = stack.popStack()
         val secondType = second.type.kClass
 
         if (topType != secondType)
@@ -332,7 +226,7 @@ class CodeScope<O : Any, R : Any>(
                 else -> throw UnsupportedOperationException("Add operation not supported for type: $topType")
             }
         }
-        pushStack(second)
+        stack.pushStack(second)
     }
 
     /**
@@ -347,6 +241,7 @@ class CodeScope<O : Any, R : Any>(
                 loadReceiver()
                 getField(ref)
             }
+
             else -> throw UnsupportedOperationException("Unsupported TypedRef type: ${ref::class.simpleName}")
         }
     }
@@ -365,9 +260,9 @@ class CodeScope<O : Any, R : Any>(
      * @throws UnsupportedOperationException if the operand type is not supported.
      */
     fun sub() {
-        val top = popStack()
+        val top = stack.popStack()
         val topType = top.type.kClass
-        val second = popStack()
+        val second = stack.popStack()
         val secondType = second.type.kClass
 
         if (topType != secondType)
@@ -382,7 +277,7 @@ class CodeScope<O : Any, R : Any>(
                 else -> throw UnsupportedOperationException("Sub operation not supported for type: $topType")
             }
         }
-        pushStack(second)
+        stack.pushStack(second)
     }
 
     /** Loads two values and subtracts them. */
@@ -399,9 +294,9 @@ class CodeScope<O : Any, R : Any>(
      * @throws UnsupportedOperationException if the operand type is not supported.
      */
     fun mul() {
-        val top = popStack()
+        val top = stack.popStack()
         val topType = top.type.kClass
-        val second = popStack()
+        val second = stack.popStack()
         val secondType = second.type.kClass
 
         if (topType != secondType)
@@ -416,7 +311,7 @@ class CodeScope<O : Any, R : Any>(
                 else -> throw UnsupportedOperationException("Mul operation not supported for type: $topType")
             }
         }
-        pushStack(second)
+        stack.pushStack(second)
     }
 
     /** Loads two values and multiplies them
@@ -436,9 +331,9 @@ class CodeScope<O : Any, R : Any>(
      * @throws UnsupportedOperationException if the operand type is not supported.
      */
     fun div() {
-        val top = popStack()
+        val top = stack.popStack()
         val topType = top.type.kClass
-        val second = popStack()
+        val second = stack.popStack()
         val secondType = second.type.kClass
 
         if (topType != secondType)
@@ -453,11 +348,11 @@ class CodeScope<O : Any, R : Any>(
                 else -> throw UnsupportedOperationException("Div operation not supported for type: $topType")
             }
         }
-        pushStack(second)
+        stack.pushStack(second)
     }
 
     /** Loads two values and divides them. */
-    fun div(a: TypedRef<*,*>, b: TypedRef<*,*>) {
+    fun div(a: TypedRef<*, *>, b: TypedRef<*, *>) {
         loadRef(a)
         loadRef(b)
         div()
@@ -481,13 +376,13 @@ class CodeScope<O : Any, R : Any>(
             }
         }
 
-        pushStack(StackValue.Constant(KlassDesc(kClass), constant))
+        stack.pushStack(StackValue.Constant(KlassDesc(kClass), constant))
     }
 
     /** Emits `aconst_null`. */
     fun nullValue() {
         raw { aconst_null() }
-        pushStack(StackValue.Null())
+        stack.pushStack(StackValue.Null())
     }
 
     /**
@@ -525,8 +420,9 @@ class CodeScope<O : Any, R : Any>(
         name: String? = null,
         noinline builder: ParameterScope.() -> Unit,
     ) = EagerDelegate { _, property ->
-        findMethod(name ?: property.name, klassDescOf<O>(), klassDescOf<R>(), builder)
-    }
+            findMethod(name ?: property.name, klassDescOf<O>(), klassDescOf<R>(), builder)
+        }
+
 
     /**
      * Ensures a method reference matches the expected invocation kind.
@@ -548,7 +444,7 @@ class CodeScope<O : Any, R : Any>(
      */
     fun invokeVirtual(ref: MethodRef<*, *>) {
         assertInvokeType(InvokeType.VIRTUAL, ref)
-        stackInvoke(ref)
+        stack.stackInvoke(ref)
 
         raw { invokevirtual(ref.owner.classDesc, ref.name, ref.methodTypeDesc) }
     }
@@ -556,7 +452,7 @@ class CodeScope<O : Any, R : Any>(
     /** Emits an `invokeinterface` call for the given method reference. */
     fun invokeInterface(ref: MethodRef<*, *>) {
         assertInvokeType(InvokeType.INTERFACE, ref)
-        stackInvoke(ref)
+        stack.stackInvoke(ref)
 
         raw { invokeinterface(ref.owner.classDesc, ref.name, ref.methodTypeDesc) }
     }
@@ -564,7 +460,7 @@ class CodeScope<O : Any, R : Any>(
     /** Emits an `invokestatic` call for the given method reference. */
     fun invokeStatic(ref: MethodRef<*, *>) {
         assertInvokeType(InvokeType.STATIC, ref)
-        stackInvoke(ref)
+        stack.stackInvoke(ref)
 
         raw { invokestatic(ref.owner.classDesc, ref.name, ref.methodTypeDesc) }
     }
@@ -572,7 +468,7 @@ class CodeScope<O : Any, R : Any>(
     /** Emits an `invokespecial` call for the given method reference. */
     fun invokeSpecial(ref: MethodRef<*, *>) {
         assertInvokeType(InvokeType.SPECIAL, ref)
-        stackInvoke(ref)
+        stack.stackInvoke(ref)
 
         raw { invokespecial(ref.owner.classDesc, ref.name, ref.methodTypeDesc) }
     }
@@ -671,7 +567,8 @@ class CodeScope<O : Any, R : Any>(
      */
     fun getStatic(name: String, owner: KlassDesc<*>, type: KlassDesc<*>) {
         raw { getstatic(owner.classDesc, name, type.classDesc) }
-        pushStack(StackValue.Field(FieldRef(name, owner, type, flags = ACC_STATIC)))
+
+        stack.pushStack(StackValue.Field(FieldRef(name, owner, type, flags = ACC_STATIC)))
     }
 
     /**
@@ -683,13 +580,15 @@ class CodeScope<O : Any, R : Any>(
         getStatic(name, klassDescOf<O>(), klassDescOf<T>())
 
     /** Emits `getstatic` from an existing field reference. */
-    fun getStatic(ref: FieldRef<*, *>) = getStatic(ref.name, ref.owner, ref.type)
+    fun getStatic(ref: FieldRef<*, *>) {
+        getStatic(ref.name, ref.owner, ref.type)
+    }
 
     /** Emits a `getfield` instruction. */
     fun getField(name: String, owner: KlassDesc<*>, type: KlassDesc<*>) {
-        popStack(owner)
+        stack.popStack(owner)
         raw { getfield(owner.classDesc, name, type.classDesc) }
-        pushStack(StackValue.Field(FieldRef(name, owner, type, flags = 0)))
+        stack.pushStack(StackValue.Field(FieldRef(name, owner, type, flags = 0)))
     }
 
     /** Loads either a static or instance field based on the reference metadata. */
@@ -700,14 +599,14 @@ class CodeScope<O : Any, R : Any>(
 
     /** Emits a `putstatic` instruction for the given field reference. */
     fun putStatic(ref: FieldRef<*, *>) {
-        popStack(ref.type)
+        stack.popStack(ref.type)
         raw { putstatic(ref.owner.classDesc, ref.name, ref.type.classDesc) }
     }
 
     /** Emits a `putfield` instruction. */
     fun putField(name: String, owner: KlassDesc<*>, type: KlassDesc<*>) {
-        popStack(type)
-        popStack(owner)
+        stack.popStack(type)
+        stack.popStack(owner)
         raw { putfield(owner.classDesc, name, type.classDesc) }
     }
 
@@ -726,7 +625,7 @@ class CodeScope<O : Any, R : Any>(
 
     /** Emits `pop`. */
     fun pop() {
-        val top = popStack()
+        val top = stack.popStack()
 
         if (top.category != 1)
             error("pop requires a category 1 value.")
@@ -736,14 +635,14 @@ class CodeScope<O : Any, R : Any>(
 
     /** Emits `pop2`. */
     fun pop2() {
-        val top = popStack()
+        val top = stack.popStack()
 
         if (top.category == 2) {
             raw { pop2() }
             return
         }
 
-        val second = popStack()
+        val second = stack.popStack()
 
         if (second.category != 1)
             error("Invalid stack shape for pop2.")
@@ -753,180 +652,180 @@ class CodeScope<O : Any, R : Any>(
 
     /** Emits `dup`. */
     fun dup() {
-        val top = popStack()
+        val top = stack.popStack()
 
         if (top.category != 1)
             error("dup requires a category 1 value.")
 
         raw { dup() }
 
-        pushStack(top)
-        pushStack(top)
+        stack.pushStack(top)
+        stack.pushStack(top)
     }
 
     /** Emits `dup_x1`. */
     fun dupX1() {
-        val v1 = popStack()
-        val v2 = popStack()
+        val v1 = stack.popStack()
+        val v2 = stack.popStack()
 
         if (v1.category != 1 || v2.category != 1)
             error("dup_x1 requires two category 1 values.")
 
         raw { dup_x1() }
 
-        pushStack(v1)
-        pushStack(v2)
-        pushStack(v1)
+        stack.pushStack(v1)
+        stack.pushStack(v2)
+        stack.pushStack(v1)
     }
 
     /** Emits `dup_x2`. */
     fun dupX2() {
-        val v1 = popStack()
+        val v1 = stack.popStack()
 
         if (v1.category != 1)
             error("dup_x2 requires a category 1 value on top.")
 
-        val v2 = popStack()
+        val v2 = stack.popStack()
 
         if (v2.category == 2) {
             raw { dup_x2() }
 
-            pushStack(v1)
-            pushStack(v2)
-            pushStack(v1)
+            stack.pushStack(v1)
+            stack.pushStack(v2)
+            stack.pushStack(v1)
             return
         }
 
-        val v3 = popStack()
+        val v3 = stack.popStack()
 
         if (v2.category != 1 || v3.category != 1)
             error("Invalid stack shape for dup_x2.")
 
         raw { dup_x2() }
 
-        pushStack(v1)
-        pushStack(v3)
-        pushStack(v2)
-        pushStack(v1)
+        stack.pushStack(v1)
+        stack.pushStack(v3)
+        stack.pushStack(v2)
+        stack.pushStack(v1)
     }
 
     /** Emits `dup2`. */
     fun dup2() {
-        val v1 = popStack()
+        val v1 = stack.popStack()
 
         if (v1.category == 2) {
             raw { dup2() }
 
-            pushStack(v1)
-            pushStack(v1)
+            stack.pushStack(v1)
+            stack.pushStack(v1)
             return
         }
 
-        val v2 = popStack()
+        val v2 = stack.popStack()
 
         if (v2.category != 1)
             error("Invalid stack shape for dup2.")
 
         raw { dup2() }
 
-        pushStack(v2)
-        pushStack(v1)
-        pushStack(v2)
-        pushStack(v1)
+        stack.pushStack(v2)
+        stack.pushStack(v1)
+        stack.pushStack(v2)
+        stack.pushStack(v1)
     }
 
     /** Emits `dup2_x1`. */
     fun dup2X1() {
-        val v1 = popStack()
+        val v1 = stack.popStack()
 
         if (v1.category == 2) {
-            val v2 = popStack()
+            val v2 = stack.popStack()
 
             if (v2.category != 1)
                 error("Invalid stack shape for dup2_x1.")
 
             raw { dup2_x1() }
 
-            pushStack(v1)
-            pushStack(v2)
-            pushStack(v1)
+            stack.pushStack(v1)
+            stack.pushStack(v2)
+            stack.pushStack(v1)
             return
         }
 
-        val v2 = popStack()
-        val v3 = popStack()
+        val v2 = stack.popStack()
+        val v3 = stack.popStack()
 
         if (v2.category != 1 || v3.category != 1)
             error("Invalid stack shape for dup2_x1.")
 
         raw { dup2_x1() }
 
-        pushStack(v2)
-        pushStack(v1)
-        pushStack(v3)
-        pushStack(v2)
-        pushStack(v1)
+        stack.pushStack(v2)
+        stack.pushStack(v1)
+        stack.pushStack(v3)
+        stack.pushStack(v2)
+        stack.pushStack(v1)
     }
 
     /** Emits `dup2_x2`. */
     fun dup2X2() {
-        val v1 = popStack()
+        val v1 = stack.popStack()
 
         when (v1.category) {
             2 -> {
-                val v2 = popStack()
+                val v2 = stack.popStack()
 
                 if (v2.category == 2) {
                     raw { dup2_x2() }
 
-                    pushStack(v1)
-                    pushStack(v2)
-                    pushStack(v1)
+                    stack.pushStack(v1)
+                    stack.pushStack(v2)
+                    stack.pushStack(v1)
                 } else {
-                    val v3 = popStack()
+                    val v3 = stack.popStack()
 
                     if (v3.category != 1)
                         error("Invalid stack shape for dup2_x2.")
 
                     raw { dup2_x2() }
 
-                    pushStack(v1)
-                    pushStack(v3)
-                    pushStack(v2)
-                    pushStack(v1)
+                    stack.pushStack(v1)
+                    stack.pushStack(v3)
+                    stack.pushStack(v2)
+                    stack.pushStack(v1)
                 }
             }
 
             1 -> {
-                val v2 = popStack()
+                val v2 = stack.popStack()
 
                 if (v2.category != 1)
                     error("Invalid stack shape for dup2_x2.")
 
-                val v3 = popStack()
+                val v3 = stack.popStack()
 
                 if (v3.category == 2) {
                     raw { dup2_x2() }
 
-                    pushStack(v2)
-                    pushStack(v1)
-                    pushStack(v3)
-                    pushStack(v2)
-                    pushStack(v1)
+                    stack.pushStack(v2)
+                    stack.pushStack(v1)
+                    stack.pushStack(v3)
+                    stack.pushStack(v2)
+                    stack.pushStack(v1)
                 } else {
-                    val v4 = popStack()
+                    val v4 = stack.popStack()
 
                     if (v3.category != 1 || v4.category != 1)
                         error("Invalid stack shape for dup2_x2.")
 
                     raw { dup2_x2() }
 
-                    pushStack(v2)
-                    pushStack(v1)
-                    pushStack(v4)
-                    pushStack(v3)
-                    pushStack(v2)
-                    pushStack(v1)
+                    stack.pushStack(v2)
+                    stack.pushStack(v1)
+                    stack.pushStack(v4)
+                    stack.pushStack(v3)
+                    stack.pushStack(v2)
+                    stack.pushStack(v1)
                 }
             }
         }
@@ -934,16 +833,16 @@ class CodeScope<O : Any, R : Any>(
 
     /** Emits `swap`. */
     fun swap() {
-        val v1 = popStack()
-        val v2 = popStack()
+        val v1 = stack.popStack()
+        val v2 = stack.popStack()
 
         if (v1.category != 1 || v2.category != 1)
             error("swap requires two category 1 values.")
 
         raw { swap() }
 
-        pushStack(v1)
-        pushStack(v2)
+        stack.pushStack(v1)
+        stack.pushStack(v2)
     }
 
     /**
@@ -954,7 +853,7 @@ class CodeScope<O : Any, R : Any>(
      * @throws NoReturnError if no return instruction was emitted.
      */
     fun build(db: CodeBuilder) {
-        if (stackTypes.isNotEmpty()) {
+        if (stack.isNotEmpty()) {
             throw StackNotEmptyError(this)
         }
 

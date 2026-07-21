@@ -1,6 +1,6 @@
-package pt.rafap.klassfile
+package pt.rafap.klassfile.utils
 
-import pt.rafap.klassfile.utils.EagerDelegate
+import pt.rafap.klassfile.KlassFileBuilder
 import java.io.File
 import java.lang.reflect.Modifier
 import java.net.URLClassLoader
@@ -29,12 +29,12 @@ fun write(className: String, bytes: ByteArray) {
 }
 
 @Suppress("UNCHECKED_CAST")
-/**
- * Loads a generated class from the runtime class loader used by [write].
- *
- * @param className the binary class name to load.
- * @return the loaded Kotlin class.
- */
+        /**
+         * Loads a generated class from the runtime class loader used by [write].
+         *
+         * @param className the binary class name to load.
+         * @return the loaded Kotlin class.
+         */
 fun <T : Any> loadClass(className: String): KClass<T> {
     val clazz = loader.loadClass(className).kotlin as KClass<T>
     return clazz
@@ -73,11 +73,13 @@ fun toModifiers(flags: Int): List<String> = buildList {
     if (Modifier.isNative(flags)) add("native")
 }
 
-inline fun <reified T: Any> klassFile(
-    name: String,
-    noinline block: KlassFileBuilder<T>.() -> Unit
-) = KlassFileBuilder.klass<T>(name, block)
+//inline fun <reified T : Any> klassFile(
+//    name: String,
+//    noinline block: KlassFileBuilder<T>.() -> Unit,
+//) = KlassFileBuilder.klass<T>(name, block)
 
 inline fun <reified T: Any> klassFile(
     noinline block: KlassFileBuilder<T>.() -> Unit
-) = EagerDelegate { _, property -> KlassFileBuilder.klass<T>(property.name, block) }
+): EagerDelegate<KlassFileBuilder<T>.Klass> =
+    EagerDelegate { _, property -> KlassFileBuilder.klass<T>(property.name, block) }
+

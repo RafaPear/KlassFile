@@ -1,6 +1,6 @@
 package pt.rafap.klassfile.models
 
-import pt.rafap.klassfile.toModifiers
+import pt.rafap.klassfile.utils.toModifiers
 import java.lang.classfile.CodeBuilder
 import java.lang.constant.MethodTypeDesc
 
