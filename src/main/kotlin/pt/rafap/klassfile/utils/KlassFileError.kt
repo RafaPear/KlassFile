@@ -90,13 +90,18 @@ class InvokeReferenceError(invokeType: InvokeType, ref: MethodRef<*, *>) : Klass
 }
 
 /** Thrown when code emission finishes with leftover stack values. */
-class StackUnderflowError(codeScope: CodeScope<*, *>) : KlassFileError() {
+class StackUnderflowError(codeScope: CodeScope<*, *>, expected: StackValue?) : KlassFileError() {
     init {
         codeScope.printStack()
     }
 
-    override val message: String = "The stack in '${codeScope.scopeName}' is empty and cannot be popped. " +
-            "Please ensure that the stack has enough elements before popping."
+    override val message: String = buildString {
+        append("The stack in '${codeScope.scopeName}' is empty and cannot be popped")
+        if (expected != null) append(", but a value of type '${expected.type.classDesc.displayName()}' was expected. ")
+        else append(". ")
+
+        append("Please ensure that the stack has enough elements before popping.")
+    }
 }
 
 /** Thrown when the simulated operand stack top has an unexpected type. */
@@ -153,4 +158,12 @@ class IncompatibleAccessError(flagsScope: FlagsScope, flag: Int) : KlassFileErro
 class NoCodeBlockDefinedError(methodRef: MethodRef<*, *>) : KlassFileError() {
     override val message: String = "The method '${methodRef}' does not have a code block defined. " +
             "Please provide a code block for the method before finishing the scope."
+}
+
+class UnsupportedKotlinArrayOfPrimitivesError : KlassFileError() {
+    override val message: String =
+        "\n\nKotlin's Array<T> is not supported by KlassFileApi when T is a primitive type (e.g. Array<Int>, Array<Float>).\n" +
+                "On the JVM, Array<Int> is represented as Integer[], whereas primitive arrays are represented as int[], float[], etc.\n" +
+                "Because these are different JVM types, this library cannot infer the intended representation automatically.\n" +
+                "Use the corresponding primitive array type instead (e.g. IntArray, LongArray, FloatArray, DoubleArray, CharArray, BooleanArray, ByteArray or ShortArray).\n\n"
 }

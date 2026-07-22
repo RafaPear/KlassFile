@@ -4,6 +4,7 @@ import pt.rafap.klassfile.models.*
 import pt.rafap.klassfile.utils.*
 import java.lang.classfile.ClassFile.ACC_STATIC
 import java.lang.classfile.CodeBuilder
+import java.lang.classfile.TypeKind
 import java.lang.constant.ConstantDescs
 import kotlin.reflect.KClass
 
@@ -217,15 +218,15 @@ class CodeScope<O : Any, R : Any>(
 
         if (topType != secondType)
             throw StackTypeMismatchError(second, top, this)
-        raw {
-            when (topType) {
-                Int::class -> iadd()
-                Long::class -> ladd()
-                Float::class -> fadd()
-                Double::class -> dadd()
-                else -> throw UnsupportedOperationException("Add operation not supported for type: $topType")
-            }
+
+        when (topType) {
+            Int::class -> raw { iadd() }
+            Long::class -> raw { ladd() }
+            Float::class -> raw { fadd() }
+            Double::class -> raw { dadd() }
+            else -> throw UnsupportedOperationException("Add operation not supported for type: ${topType.simpleName}")
         }
+
         stack.pushStack(second)
     }
 
@@ -268,15 +269,15 @@ class CodeScope<O : Any, R : Any>(
         if (topType != secondType)
             throw StackTypeMismatchError(second, top, this)
 
-        raw {
-            when (topType) {
-                Int::class -> isub()
-                Long::class -> lsub()
-                Float::class -> fsub()
-                Double::class -> dsub()
-                else -> throw UnsupportedOperationException("Sub operation not supported for type: $topType")
-            }
+
+        when (topType) {
+            Int::class -> raw { isub() }
+            Long::class -> raw { lsub() }
+            Float::class -> raw { fsub() }
+            Double::class -> raw { dsub() }
+            else -> throw UnsupportedOperationException("Sub operation not supported for type: ${topType.simpleName}")
         }
+
         stack.pushStack(second)
     }
 
@@ -302,14 +303,12 @@ class CodeScope<O : Any, R : Any>(
         if (topType != secondType)
             throw StackTypeMismatchError(second, top, this)
 
-        raw {
-            when (topType) {
-                Int::class -> imul()
-                Long::class -> lmul()
-                Float::class -> fmul()
-                Double::class -> dmul()
-                else -> throw UnsupportedOperationException("Mul operation not supported for type: $topType")
-            }
+        when (topType) {
+            Int::class -> raw { imul() }
+            Long::class -> raw { lmul() }
+            Float::class -> raw { fmul() }
+            Double::class -> raw { dmul() }
+            else -> throw UnsupportedOperationException("Mul operation not supported for type: ${topType.simpleName}")
         }
         stack.pushStack(second)
     }
@@ -339,15 +338,15 @@ class CodeScope<O : Any, R : Any>(
         if (topType != secondType)
             throw StackTypeMismatchError(second, top, this)
 
-        raw {
-            when (topType) {
-                Int::class -> idiv()
-                Long::class -> ldiv()
-                Float::class -> fdiv()
-                Double::class -> ddiv()
-                else -> throw UnsupportedOperationException("Div operation not supported for type: $topType")
-            }
+
+        when (topType) {
+            Int::class -> raw { idiv() }
+            Long::class -> raw { ldiv() }
+            Float::class -> raw { fdiv() }
+            Double::class -> raw { ddiv() }
+            else -> throw UnsupportedOperationException("Div operation not supported for type: ${topType.simpleName}")
         }
+
         stack.pushStack(second)
     }
 
@@ -357,6 +356,476 @@ class CodeScope<O : Any, R : Any>(
         loadRef(b)
         div()
     }
+
+    /**
+     * Calculates the remainder of two numeric values.
+     *
+     * @throws StackTypeMismatchError if the operand types differ.
+     * @throws UnsupportedOperationException if the operand type is not supported.
+     */
+    fun rem() {
+        val top = stack.popStack()
+        val topType = top.type.kClass
+        val second = stack.popStack()
+        val secondType = second.type.kClass
+
+        if (topType != secondType)
+            throw StackTypeMismatchError(second, top, this)
+
+        when (topType) {
+            Int::class -> raw { irem() }
+            Long::class -> raw { lrem() }
+            Float::class -> raw { frem() }
+            Double::class -> raw { drem() }
+            else -> throw UnsupportedOperationException("Rem operation not supported for type: ${topType.simpleName}")
+        }
+
+        stack.pushStack(second)
+    }
+
+    /** Loads two values and takes the remainder. */
+    fun rem(a: TypedRef<*, *>, b: TypedRef<*, *>) {
+        loadRef(a)
+        loadRef(b)
+        rem()
+    }
+
+    /**
+     * Calculates the negative of a numeric value.
+     *
+     * @throws UnsupportedOperationException if the operand type is not supported.
+     */
+    fun neg() {
+        val top = stack.popStack()
+        when (val topType = top.type.kClass) {
+            Int::class -> raw { ineg() }
+            Long::class -> raw { lneg() }
+            Float::class -> raw { fneg() }
+            Double::class -> raw { dneg() }
+            else -> throw UnsupportedOperationException("Neg operation not supported for type: ${topType.simpleName}")
+        }
+
+        stack.pushStack(top)
+    }
+
+    /** Takes the negative of a value */
+    fun neg(a: TypedRef<*, *>) {
+        loadRef(a)
+        neg()
+    }
+
+    /**
+     * Loads two values and shifts the first left by the second.
+     *
+     * @throws UnsupportedOperationException if the operand type is not supported.
+     */
+    fun shl() {
+        // Shift
+        stack.popStack(klassDescOf<Int>())
+
+        val top = stack.popStack()
+        val topType = top.type.kClass
+
+        when (topType) {
+            Int::class -> raw { ishl() }
+            Long::class -> raw { lshl() }
+            else -> throw UnsupportedOperationException("Shl operation not supported for type: ${topType.simpleName}")
+        }
+
+        stack.pushStack(top)
+    }
+
+    /** Loads two values and shifts the first left by the second. */
+    fun shl(a: TypedRef<*, *>, b: TypedRef<*, *>) {
+        loadRef(a)
+        loadRef(b)
+        shl()
+    }
+
+    /** Loads two values and shifts the first left by the second. */
+    fun shl(a: TypedRef<*, *>, shift: Int) {
+        loadRef(a)
+        ldc(shift)
+        shl()
+    }
+
+    /**
+     * Loads two values and shifts the first right by the second.
+     *
+     * @throws UnsupportedOperationException if the operand type is not supported.
+     */
+    fun shr() {
+        // Shift
+        stack.popStack(klassDescOf<Int>())
+
+        val top = stack.popStack()
+        val topType = top.type.kClass
+
+        when (topType) {
+            Int::class -> raw { ishr() }
+            Long::class -> raw { lshr() }
+            else -> throw UnsupportedOperationException("Shr operation not supported for type: ${topType.simpleName}")
+        }
+
+        stack.pushStack(top)
+    }
+
+    /** Loads two values and shifts the first right by the second. */
+    fun shr(a: TypedRef<*, *>, b: TypedRef<*, *>) {
+        loadRef(a)
+        loadRef(b)
+        shr()
+    }
+
+    /** Loads two values and shifts the first right by the second. */
+    fun shr(a: TypedRef<*, *>, shift: Int) {
+        loadRef(a)
+        ldc(shift)
+        shr()
+    }
+
+    /**
+     * Loads two values and shifts the first right by the second.
+     *
+     * @throws UnsupportedOperationException if the operand type is not supported.
+     */
+    fun uShr() {
+        // Shift
+        stack.popStack(klassDescOf<Int>())
+
+        val top = stack.popStack()
+        val topType = top.type.kClass
+
+        when (topType) {
+            Int::class -> raw { iushr() }
+            Long::class -> raw { lushr() }
+            else -> throw UnsupportedOperationException("uShr operation not supported for type: ${topType.simpleName}")
+        }
+
+        stack.pushStack(top)
+    }
+
+    /** Loads two values and shifts the first right by the second. */
+    fun uShr(a: TypedRef<*, *>, b: TypedRef<*, *>) {
+        loadRef(a)
+        loadRef(b)
+        uShr()
+    }
+
+    /** Loads two values and shifts the first right by the second. */
+    fun uShr(a: TypedRef<*, *>, shift: Int) {
+        loadRef(a)
+        ldc(shift)
+        uShr()
+    }
+
+    /**
+     * Calculates the bitwise AND of two numeric values.
+     *
+     * @throws StackTypeMismatchError if the operand types differ.
+     * @throws UnsupportedOperationException if the operand type is not supported.
+     */
+    fun and() {
+        val top = stack.popStack()
+        val topType = top.type.kClass
+        val second = stack.popStack()
+        val secondType = second.type.kClass
+
+        if (topType != secondType)
+            throw StackTypeMismatchError(second, top, this)
+
+        when (topType) {
+            Int::class -> raw { iand() }
+            Long::class -> raw { land() }
+            else -> throw UnsupportedOperationException("And operation not supported for type: ${topType.simpleName}")
+        }
+
+        stack.pushStack(second)
+    }
+
+    /** Loads two values and calculates the bitwise AND. */
+    fun and(a: TypedRef<*, *>, b: TypedRef<*, *>) {
+        loadRef(a)
+        loadRef(b)
+        and()
+    }
+
+    /**
+     * Calculates the bitwise OR of two numeric values.
+     *
+     * @throws StackTypeMismatchError if the operand types differ.
+     * @throws UnsupportedOperationException if the operand type is not supported.
+     */
+    fun or() {
+        val top = stack.popStack()
+        val topType = top.type.kClass
+        val second = stack.popStack()
+        val secondType = second.type.kClass
+
+        if (topType != secondType)
+            throw StackTypeMismatchError(second, top, this)
+
+        when (topType) {
+            Int::class -> raw { ior() }
+            Long::class -> raw { lor() }
+            else -> throw UnsupportedOperationException("Or operation not supported for type: ${topType.simpleName}")
+        }
+
+        stack.pushStack(second)
+    }
+
+    /** Loads two values or calculates the bitwise OR. */
+    fun or(a: TypedRef<*, *>, b: TypedRef<*, *>) {
+        loadRef(a)
+        loadRef(b)
+        or()
+    }
+
+    /**
+     * Calculates the bitwise XOR of two numeric values.
+     *
+     * @throws StackTypeMismatchError if the operand types differ.
+     * @throws UnsupportedOperationException if the operand type is not supported.
+     */
+    fun xor() {
+        val top = stack.popStack()
+        val topType = top.type.kClass
+        val second = stack.popStack()
+        val secondType = second.type.kClass
+
+        if (topType != secondType)
+            throw StackTypeMismatchError(second, top, this)
+
+        when (topType) {
+            Int::class -> raw { ixor() }
+            Long::class -> raw { lxor() }
+            else -> throw UnsupportedOperationException("Xor operation not supported for type: ${topType.simpleName}")
+        }
+
+        stack.pushStack(second)
+    }
+
+    /** Loads two values xor calculates the bitwise XOR. */
+    fun xor(a: TypedRef<*, *>, b: TypedRef<*, *>) {
+        loadRef(a)
+        loadRef(b)
+        xor()
+    }
+
+    /**
+     * Converts the stack top value to the destination type.
+     *
+     * @throws UnsupportedOperationException if the operand type is not supported.
+     */
+    fun convert(destType: KClass<*>) {
+        val top = stack.popStack()
+        val topType = top.type.kClass
+
+        when (topType) {
+            Int::class -> {
+                when (destType) {
+                    Long::class -> raw { i2l() }
+                    Float::class -> raw { i2f() }
+                    Double::class -> raw { i2d() }
+                    Byte::class -> raw { i2b() }
+                    Char::class -> raw { i2c() }
+                    Short::class -> raw { i2s() }
+                    else -> throw UnsupportedOperationException("Conversion from Int to ${destType.simpleName} is not supported.")
+                }
+            }
+
+            Long::class -> {
+                when (destType) {
+                    Int::class -> raw { l2i() }
+                    Float::class -> raw { l2f() }
+                    Double::class -> raw { l2d() }
+                    else -> throw UnsupportedOperationException("Conversion from Long to ${destType.simpleName} is not supported.")
+                }
+            }
+
+            Float::class -> {
+                when (destType) {
+                    Int::class -> raw { f2i() }
+                    Long::class -> raw { f2l() }
+                    Double::class -> raw { f2d() }
+                    else -> throw UnsupportedOperationException("Conversion from Float to ${destType.simpleName} is not supported.")
+                }
+            }
+
+            Double::class -> {
+                when (destType) {
+                    Int::class -> raw { d2i() }
+                    Long::class -> raw { d2l() }
+                    Float::class -> raw { d2f() }
+                    else -> throw UnsupportedOperationException("Conversion from Double to ${destType.simpleName} is not supported.")
+                }
+            }
+
+            else -> throw UnsupportedOperationException("Conversion from ${topType.simpleName} to ${destType.simpleName} is not supported.")
+        }
+
+        val resultType = when (destType) {
+            Byte::class, Short::class, Char::class -> Int::class
+            else -> destType
+        }
+
+        stack.pushStack(top.withType(KlassDesc(resultType)))
+    }
+
+    inline fun <reified T : Any> convert() = convert(T::class)
+
+    /**
+     * Compares two numeric values on the stack and pushes an integer result.
+     *
+     * @throws StackTypeMismatchError if the operand types differ.
+     * @throws UnsupportedOperationException if the operand type is not supported.
+     */
+    fun cmp() {
+        val top = stack.popStack()
+        val topType = top.type.kClass
+        val second = stack.popStack()
+        val secondType = second.type.kClass
+
+        if (topType != secondType)
+            throw StackTypeMismatchError(second, top, this)
+
+        when (topType) {
+            Float::class -> raw { fcmpl() }
+            Double::class -> raw { dcmpl() }
+            Long::class -> raw { lcmp() }
+            else -> throw UnsupportedOperationException("Cmp operation not supported for type: ${topType.simpleName}")
+        }
+
+        stack.pushStack(top.withType(KlassDesc(Int::class)))
+    }
+
+    /** Loads two values and compares them. */
+    fun cmp(a: TypedRef<*, *>, b: TypedRef<*, *>) {
+        loadRef(a)
+        loadRef(b)
+        cmp()
+    }
+
+    fun KlassDesc<*>.toTypeKind(): TypeKind? =
+        when (kClass) {
+            Boolean::class -> TypeKind.BooleanType
+            Byte::class -> TypeKind.ByteType
+            Char::class -> TypeKind.CharType
+            Short::class -> TypeKind.ShortType
+            Int::class -> TypeKind.IntType
+            Long::class -> TypeKind.LongType
+            Float::class -> TypeKind.FloatType
+            Double::class -> TypeKind.DoubleType
+            else -> null
+        }
+
+    fun newArray(type: KlassDesc<*>) {
+        stack.popStack(klassDescOf<Int>())
+
+        val kind = type.toTypeKind()
+
+        if (kind != null) raw { newarray(kind) }
+        else raw { anewarray(type.classDesc) }
+
+        stack.pushStack(StackValue.NewArrayObject(type))
+    }
+
+    fun newMultiArray(type: KlassDesc<*>, dimensions: Int) {
+        TODO("Not yet implemented: newMultiArray for type ${type.kClass.simpleName} with $dimensions dimensions")
+    }
+
+    inline fun <reified T : Any> newArray() =
+        newArray(klassDescOf<T>())
+
+    private fun popArray(): KlassDesc.ArrayKlassDesc<*> {
+        val value = stack.popStack()
+
+        val array = value.type
+        if (array !is KlassDesc.ArrayKlassDesc<*>) {
+            throw StackTypeMismatchError(
+                StackValue.Unknown(klassDescOf<Array<*>>()),
+                value,
+                this
+            )
+        }
+
+        return array
+    }
+
+    fun arrayLength() {
+        popArray()
+        raw { arraylength() }
+        stack.pushStack(StackValue.Unknown(klassDescOf<Int>()))
+    }
+
+    fun arrayLoad() {
+        stack.popStack(klassDescOf<Int>()) // idx
+        val elementType = popArray().elementType
+
+        when (elementType.kClass) {
+            Int::class -> raw { iaload() }
+            Long::class -> raw { laload() }
+            Float::class -> raw { faload() }
+            Double::class -> raw { daload() }
+            Byte::class, Boolean::class -> raw { baload() }
+            Char::class -> raw { caload() }
+            Short::class -> raw { saload() }
+            else -> raw { aaload() }
+        }
+
+        stack.pushStack(StackValue.Unknown(elementType))
+    }
+
+    /**
+     * Stores a value into an array at the specified index.
+     *
+     * @throws StackTypeMismatchError if the value type does not match the array element type.
+     */
+    fun arrayStore() {
+        val value = stack.popStack()
+        stack.popStack(klassDescOf<Int>()) // idx
+        val elementType = popArray().elementType
+
+        if (elementType != value.type)
+            throw StackTypeMismatchError(
+                StackValue.Unknown(elementType),
+                value,
+                this
+            )
+
+        when (elementType.kClass) {
+            Int::class -> raw { iastore() }
+            Long::class -> raw { lastore() }
+            Float::class -> raw { fastore() }
+            Double::class -> raw { dastore() }
+            Byte::class, Boolean::class -> raw { bastore() }
+            Char::class -> raw { castore() }
+            Short::class -> raw { sastore() }
+            else -> raw { aastore() }
+        }
+    }
+
+    fun checkCast(type: KlassDesc<*>) {
+        val value = stack.popStack()
+
+        raw { checkcast(type.classDesc) }
+
+        stack.pushStack(value.withType(type))
+    }
+
+    inline fun <reified T : Any> checkCast() =
+        checkCast(klassDescOf<T>())
+
+    fun instanceOf(type: KlassDesc<*>) {
+        stack.popStack()
+
+        raw { instanceOf(type.classDesc) }
+
+        stack.pushStack(StackValue.Unknown(klassDescOf<Int>()))
+    }
+
+    inline fun <reified T : Any> instanceOf() =
+        instanceOf(klassDescOf<T>())
 
     /**
      * Loads a constant using an explicit Kotlin type.
@@ -420,8 +889,8 @@ class CodeScope<O : Any, R : Any>(
         name: String? = null,
         noinline builder: ParameterScope.() -> Unit,
     ) = EagerDelegate { _, property ->
-            findMethod(name ?: property.name, klassDescOf<O>(), klassDescOf<R>(), builder)
-        }
+        findMethod(name ?: property.name, klassDescOf<O>(), klassDescOf<R>(), builder)
+    }
 
 
     /**
@@ -556,6 +1025,23 @@ class CodeScope<O : Any, R : Any>(
     /** Replays a method invocation using the reference's own dispatch kind. */
     operator fun MethodRef<*, *>.invoke() {
         invokeMethod(this)
+    }
+
+    fun FieldRef<*, *>.load() {
+        if (isStatic) getStatic(this)
+        else {
+            loadReceiver()
+            getField(this)
+        }
+    }
+
+    fun FieldRef<*, *>.store(body: CodeScope<O, R>.() -> Unit) {
+        if (isStatic) putStatic(this)
+        else {
+            loadReceiver()
+            body()
+            putField(this)
+        }
     }
 
     /**
@@ -858,7 +1344,9 @@ class CodeScope<O : Any, R : Any>(
         }
 
         if (!hasReturn) {
-            throw NoReturnError(this)
+            println("[WARN]: " + NoReturnError(this).toString())
+            println("[WARN]: One was automatically added to the end of the method.")
+            ret()
         }
 
         for (instruction in instructions) db.instruction()

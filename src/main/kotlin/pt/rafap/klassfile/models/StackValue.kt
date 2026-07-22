@@ -7,13 +7,26 @@ import pt.rafap.klassfile.utils.klassDescOf
  *
  * The hierarchy is used to validate stack shape and value categories while bytecode is being emitted.
  */
-sealed class StackValue(
-    open val type: KlassDesc<*>,
-    val category: Int = when (type.kClass) {
-        Long::class, Double::class -> 2
-        else -> 1
-    },
-) {
+sealed class StackValue(open val type: KlassDesc<*>) {
+    val category: Int
+        get() = when (type.kClass) {
+            Long::class, Double::class -> 2
+            else -> 1
+        }
+
+    fun withType(type: KlassDesc<*>): StackValue {
+        return when (this) {
+            is Constant -> Constant(type, value)
+            is Parameter -> Parameter(ref)
+            is Local -> Local(ref)
+            is Field -> Field(ref)
+            is ReturnValue -> ReturnValue(ref)
+            is NewObject -> NewObject(type)
+            is NewArrayObject -> NewArrayObject(type as KlassDesc.ArrayKlassDesc<*>)
+            is Null -> Null()
+            is Unknown -> Unknown(type)
+        }
+    }
 
     /** A constant literal value pushed from the constant pool. */
     data class Constant(
@@ -64,10 +77,19 @@ sealed class StackValue(
         override fun toString() = "${type.classDesc.displayName()} (new)"
     }
 
+    data class NewArrayObject(
+        override val type: KlassDesc.ArrayKlassDesc<*>,
+    ) : StackValue(type) {
+        constructor(elementType: KlassDesc<*>) : this(elementType.array())
+
+        /** Returns a debug representation of a newly created array object value. */
+        override fun toString() = "${type.classDesc.displayName()} (new array)"
+    }
+
     /** The explicit `null` reference value. */
     data class Null(
         val dummy: Unit = Unit,
-    ) : StackValue(klassDescOf<Any>()){
+    ) : StackValue(klassDescOf<Any>()) {
         /** Returns a debug representation of the null literal. */
         override fun toString() = "null"
     }

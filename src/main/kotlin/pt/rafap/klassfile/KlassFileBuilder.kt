@@ -38,10 +38,11 @@ class KlassFileBuilder<O : Any> private constructor(
     val thisClassDesc = classDesc(name)
 
     /** Kotlin/JVM descriptor for the class being generated. */
-    val thisKlassDesc = KlassDesc(ClassDesc.of(name), inheritor)
+    val thisKlassDesc = KlassDesc(inheritor)
+    val owner = KlassDesc(thisClassDesc, inheritor)
 
     private val flagsScope = FlagsScope.ClassFlagsScope(name)
-    private val fieldScope = FieldScope(thisKlassDesc)
+    private val fieldScope = FieldScope(owner)
     private val methodRefs = mutableListOf<MethodRef<*, *>>()
     private var hasNoArgsConstructor: Boolean = false
 
@@ -293,6 +294,10 @@ class KlassFileBuilder<O : Any> private constructor(
             error(buildString {
                 appendLine("Missing implementations:")
                 missing.forEach {
+                    appendLine(" - ${it.name} ${it.methodTypeDesc}")
+                }
+                appendLine("Current:")
+                implementedMethods.forEach {
                     appendLine(" - ${it.name} ${it.methodTypeDesc}")
                 }
             })

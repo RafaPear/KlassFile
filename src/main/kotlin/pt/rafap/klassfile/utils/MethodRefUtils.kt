@@ -170,13 +170,21 @@ fun <O : Any, R : Any> resolveMethod(
 
     // First, try to find the method by the name
 
-    val crudeKotlinMethods = kClass.declaredFunctions.map { it.toMethodRef(owner, type) }
+    val crudeKotlinMethods = kClass.declaredFunctions
+        .filter { it.name == name }
+        .map { it.toMethodRef(owner, type) }
 
-    val crudeJavaMethods = kClass.java.methods.map { it.toMethodRef(owner, type) }
+    val crudeJavaMethods = kClass.java.methods
+        .filter { it.name == name }
+        .map { it.toMethodRef(owner, type) }
 
-    val crudeKotlinConstructors = kClass.constructors.map { it.toMethodRef(owner, type) }
+    val crudeKotlinConstructors = kClass.constructors
+        .filter { it.name == name }
+        .map { it.toMethodRef(owner, type) }
 
-    val crudeJavaConstructors = kClass.java.declaredConstructors.mapNotNull { it.toMethodRef<O, R>(owner) }
+    val crudeJavaConstructors = kClass.java.declaredConstructors
+        .filter { it.name == name }
+        .mapNotNull { it.toMethodRef<O, R>(owner) }
 
     val crudeMethods = (crudeJavaMethods + crudeKotlinMethods).toSet()
     val crudeConstructors = (crudeJavaConstructors + crudeKotlinConstructors).toSet()

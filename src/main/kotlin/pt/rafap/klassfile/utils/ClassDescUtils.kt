@@ -7,6 +7,7 @@ import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.full.starProjectedType
 import kotlin.reflect.jvm.jvmErasure
+import kotlin.reflect.typeOf
 
 /**
  * Creates a [ClassDesc] from a binary class name using [ClassDesc.of].
@@ -97,4 +98,39 @@ inline fun <reified T> classDesc(): ClassDesc = classDesc(T::class)
  *
  * @return the corresponding [KlassDesc].
  */
-inline fun <reified T : Any> klassDescOf(): KlassDesc<T> = KlassDesc(classDesc<T>(), T::class)
+@Suppress("UNCHECKED_CAST")
+inline fun <reified T : Any> klassDescOf(): KlassDesc<T> {
+
+    // Reject Array<Int>, Array<Float>, etc.
+    if (T::class.starProjectedType == Array::class.starProjectedType) {
+        val elementClass = typeOf<T>()
+            .arguments
+            .firstOrNull()
+            ?.type
+            ?.classifier as? KClass<*>
+            ?: error("Unable to determine the array element type for ${T::class}")
+
+        if (elementClass in setOf(
+                Byte::class,
+                Short::class,
+                Int::class,
+                Long::class,
+                Float::class,
+                Double::class,
+                Char::class,
+                Boolean::class
+            )
+        ) throw UnsupportedKotlinArrayOfPrimitivesError()
+
+
+        return KlassDesc<T>(typeOf<T>().arguments[0].type!!).array() as KlassDesc<T>
+    }
+
+    // Primitive arrays (IntArray, FloatArray, ...)
+    if (T::class.java.isArray) {
+        val componentType = T::class.java.componentType
+        return KlassDesc<T>(componentType).array() as KlassDesc<T>
+    }
+
+    return KlassDesc(T::class)
+}

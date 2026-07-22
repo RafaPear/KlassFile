@@ -65,7 +65,7 @@ class Stack(private val codeScope: CodeScope<*, *>) {
      * @throws StackUnderflowError when no values are available.
      */
     fun popStack(): StackValue {
-        return stackTypes.removeLastOrNull() ?: throw StackUnderflowError(codeScope)
+        return stackTypes.removeLastOrNull() ?: throw StackUnderflowError(codeScope, null)
     }
 
     /**
@@ -93,30 +93,10 @@ class Stack(private val codeScope: CodeScope<*, *>) {
         pushStack(ref)
     }
 
-
-    /**
-     * Returns whether this descriptor accepts [other] by JVM assignability rules.
-     *
-     * @param other the candidate descriptor.
-     * @return `true` when [other] can be assigned to this descriptor.
-     */
-    private fun KlassDesc<*>.isAssignableFrom(other: KlassDesc<*>): Boolean {
-        if (classDesc == other.classDesc)
-            return true
-
-        val expected = kClass.java
-        val actual = other.kClass.java
-
-        if (expected.isPrimitive || actual.isPrimitive)
-            return false
-
-        return expected.isAssignableFrom(actual)
-    }
-
     /** Validates the most recent tracked value against [expected]. */
     private fun expectTop(expected: StackValue) {
         val actual = stackTypes.lastOrNull()
-            ?: throw StackUnderflowError(codeScope)
+            ?: throw StackUnderflowError(codeScope, expected)
 
         if (!expected.type.isAssignableFrom(actual.type)) {
             throw StackTypeMismatchError(expected, actual, codeScope)

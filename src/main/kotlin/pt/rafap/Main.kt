@@ -1,152 +1,81 @@
 package pt.rafap
 
 import pt.rafap.klassfile.utils.klassFile
-import java.io.PrintStream
 
-interface Counter {
-
-    // Increments the current counter by one.
-    fun increment()
-
-    // Adds the given value to the counter.
-    fun addValue(value: Int)
-
-    // Resets the counter to zero.
-    fun reset()
-
-    // Returns the current counter value.
-    fun get(): Int
-
-    // Prints the current counter value.
-    fun print()
+abstract class ArrayTest {
+    abstract val size: Int
+    abstract operator fun get(idx: Int): Int
+    abstract operator fun set(idx: Int, value: Int)
 }
 
-fun main() {
+fun buildArr(): ArrayTest {
+    val clazz by klassFile<ArrayTest> {
 
-    // Generate a concrete implementation of the Counter interface.
-    val counter by klassFile<Counter> {
-
-        // Configure the generated class.
         access { public() }
 
-        // Field name is defined by the property name.
-        val value by field<Int>()
-
-        // Automatically generate a private getter and setter.
-        val getValue by getter(value) { private() }
-        val setValue by setter(value) { private() }
+        val size by field<Int> { public() }
+        val array by field<IntArray>()
 
         constructor {
             access { public() }
 
             code {
-                // Call Object.<init>()
                 defaultCtor()
 
-                // value = 0
-                loadReceiver() // Every MethodScope contains an implicit receiver
-                ldc(0)
-                setValue()
-
-                ret()
-            }
-        }
-
-        // Generates a method with parameters.
-        val addValue by method<Unit> {
-
-            // Declare JVM method parameters.
-            val amount by parameter<Int>()
-
-            access { public() }
-
-            code {
-                // value += amount
-                loadReceiver()
-                add(value, amount)
-                setValue()
-                ldc(0)
-
-                ret()
-            }
-        }
-
-        method<Unit>("increment") {
-
-            access { public() }
-
-            code {
-                loadReceiver()
-                ldc(1)
-
-                // Invoke another generated method through its MethodRef.
-                addValue()
-
-                ret()
-            }
-        }
-
-        method<Unit>("reset") {
-
-            access { public() }
-
-            code {
-                loadReceiver()
-                ldc(0)
-                setValue()
-
-                ret()
-            }
-        }
-
-        method<Int>("get") {
-
-            access { public() }
-
-            code {
-                loadReceiver()
-                getValue()
-
-                ret()
-            }
-        }
-
-        method<Unit>("print") {
-
-            access { public() }
-
-            code {
-
-                // Access a static JVM field.
-                getStatic<System, PrintStream>("out")
-
-                loadReceiver()
-                getValue()
-
-                // Resolve an existing JVM method using reflection.
-                val println by findMethod<PrintStream, Unit> {
-                    param<Int>()
+                size.store {
+                    ldc(5)
                 }
 
-                // Invoke the resolved MethodRef.
-                println()
-
+                array.store {
+                    size.load()
+                    newArray<Int>()
+                }
                 ret()
             }
         }
 
+        val getSize by getter(size)
+
+        method<Int>("get") {
+            access { public() }
+
+            val idx by parameter<Int>()
+
+            code {
+                array.load()
+                loadRef(idx)
+                arrayLoad()
+                ret()
+            }
+        }
+
+        method<Unit>("set") {
+            access { public() }
+
+            val idx by parameter<Int>()
+            val value by parameter<Int>()
+
+            code {
+                array.load()
+                loadRef(idx)
+                loadRef(value)
+                arrayStore()
+                ret()
+            }
+        }
     }
-    val instance = counter.writeAndGetInstance() // Build, load and instantiate the generated class.
 
-    instance.increment()
-    instance.increment()
-    instance.addValue(10)
+    return clazz.writeAndGetInstance()
+}
 
-    println(instance.get()) // 12
+fun main() {
+    val instance = buildArr()
 
-    instance.print()
+    for (i in 0 until instance.size) {
+        instance[i] = i * 10
+    }
 
-    instance.reset()
-
-    println(instance.get()) // 0
+    for (i in 0 until instance.size) {
+        println("instance[$i] = ${instance[i]}")
+    }
 }
