@@ -17,18 +17,9 @@ fun buildArr(): Sum {
 
             code {
                 val sum by local<Int>()
-                val idx by local<Int>()
-                val ref1 by label()
-                val ref2 by label()
 
-
-                ref1.bind()
-
-                ldc(0)
+                ldc(1)
                 store(sum)
-
-                goto(ref1)
-
                 load(sum)
                 ret()
 
