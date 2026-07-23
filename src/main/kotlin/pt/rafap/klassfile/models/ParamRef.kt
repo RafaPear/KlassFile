@@ -9,8 +9,8 @@ package pt.rafap.klassfile.models
 open class ParamRef<T : Any>(
     val name: String,
     override val type: KlassDesc<T>,
-    val order: Int,
-): TypedRef<Any, T> {
+    override val order: Int,
+): OrderedRef<T> {
     override val owner: KlassDesc<Any>
         get() = error("No owner available")
     /**

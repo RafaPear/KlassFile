@@ -10,10 +10,26 @@ class Stack(private val codeScope: CodeScope<*, *>) {
 
     private var stackTypes = mutableListOf<StackValue>()
     private var invocationTrace = mutableListOf<MethodRef<*, *>>()
+    private var isUnreachable = false
+    val size: Int
+        get() = stackTypes.size
+
+    fun setUnreachable() {
+        isUnreachable = true
+    }
+
+    fun clearUnreachable() {
+        isUnreachable = false
+    }
+
+    fun isUnreachable() = isUnreachable
 
     /** Prints the tracked value trace for debugging. */
     fun printStackTypes() {
-        if (stackTypes.isEmpty()) return
+        if (stackTypes.isEmpty()) {
+            println("Stack: (EMPTY)")
+            return
+        }
 
         println("Current Stack Types:")
         stackTypes.forEachIndexed { index, stackValue ->
@@ -23,7 +39,10 @@ class Stack(private val codeScope: CodeScope<*, *>) {
 
     /** Prints the tracked method-invocation trace for debugging. */
     fun printInvocationTrace() {
-        if (invocationTrace.isEmpty()) return
+        if (invocationTrace.isEmpty()) {
+            println("Invocation Trace: (EMPTY)")
+            return
+        }
 
         println("Current Invocation Trace:")
         invocationTrace.forEachIndexed { index, methodRef ->
@@ -39,13 +58,16 @@ class Stack(private val codeScope: CodeScope<*, *>) {
 
     /** Records a value in the internal value trace when applicable. */
     fun pushStack(stackValue: StackValue) {
+        if (isUnreachable) return
         if (stackValue.type.classDesc == ConstantDescs.CD_void) return
         stackTypes.add(stackValue)
     }
 
-    /** Records a parameter value in the internal value trace. */
-    fun pushStack(ref: ParamRef<*>) {
-        pushStack(StackValue.Parameter(ref))
+    fun pushStack(ref: OrderedRef<*>) {
+        when (ref) {
+            is ParamRef<*> -> pushStack(StackValue.Parameter(ref))
+            is LocalRef<*> -> pushStack(StackValue.Local(ref))
+        }
     }
 
     /** Records a field value in the internal value trace. */

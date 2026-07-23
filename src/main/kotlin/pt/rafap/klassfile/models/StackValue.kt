@@ -47,7 +47,7 @@ sealed class StackValue(open val type: KlassDesc<*>) {
 
     /** A value stored in a local slot. */
     data class Local(
-        val ref: ParamRef<*>,
+        val ref: LocalRef<*>,
     ) : StackValue(ref.type) {
         /** Returns a debug representation of the referenced local slot. */
         override fun toString() = "$ref (local)"

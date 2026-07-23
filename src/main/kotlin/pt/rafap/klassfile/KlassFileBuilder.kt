@@ -179,7 +179,7 @@ class KlassFileBuilder<O : Any> private constructor(
         field: FieldRef<O, T>,
         access: FlagsScope.MethodFlagsScope.() -> Unit = { public() },
     ) = method<Unit>(name, invokeType = if (field.isStatic) InvokeType.STATIC else InvokeType.VIRTUAL) {
-        val value by parameter(field.type)
+        val value by param(field.type)
 
         access { access() }
 
@@ -313,12 +313,15 @@ class KlassFileBuilder<O : Any> private constructor(
         checkMethodImplementations()
 
         // Add the required no-argument constructor if the class has no explicit constructors
-        if (!hasNoArgsConstructor) constructor()
+        if (!hasNoArgsConstructor) {
+            warn("No explicit constructor defined for class '$name'. Adding a default public no-argument constructor.")
+            constructor()
+        }
 
         return ClassFile.of().build(ClassDesc.of(name)) { clb ->
             val flags = flagsScope.build()
             if (flags and ACC_PUBLIC == 0) {
-                println("[WARNING]: class $name is not public. Consider setting access flags with 'access'.")
+                warn("class '$name' is not public. Consider setting access flags with 'access'.")
             }
 
             clb.withFlags(flagsScope.build())
@@ -326,7 +329,7 @@ class KlassFileBuilder<O : Any> private constructor(
             val thisKClass = thisKlassDesc.kClass
 
             val desc = thisKlassDesc.kClass.java.describeConstable().getOrNull()
-                ?: throw IllegalStateException("ClassDesc for $name is not available. Ensure the class is properly defined.")
+                ?: throw IllegalStateException("ClassDesc for '$name' is not available. Ensure the class is properly defined.")
 
             if (thisKClass.java.isInterface) clb.withInterfaces(Interfaces.ofSymbols(desc).interfaces())
             else if (thisKClass.isAbstract) clb.withSuperclass(desc)

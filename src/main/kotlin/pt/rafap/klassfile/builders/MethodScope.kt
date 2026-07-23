@@ -62,23 +62,27 @@ class MethodScope<O : Any, R : Any>(
     fun receiver(): EagerDelegate<ParamRef.ReceiverRef<O>> = EagerDelegate { _, _ -> receiver }
 
     /** Adds a parameter with an explicit type descriptor. */
-    fun <R : Any> parameter(name: String, type: KlassDesc<R>): ParamRef<R> = generateParam(name, type)
+    fun <R : Any> param(name: String, type: KlassDesc<R>): ParamRef<R> = generateParam(name, type)
 
     /** Adds a parameter using a reified Kotlin type. */
-    inline fun <reified R : Any> parameter(name: String): ParamRef<R> = parameter(name, klassDescOf<R>())
+    inline fun <reified R : Any> param(name: String): ParamRef<R> = param(name, klassDescOf<R>())
 
     /** Adds a lazily named parameter based on the backing property name. */
-    inline fun <reified R : Any> parameter(): EagerDelegate<ParamRef<R>> = EagerDelegate { _, property ->
-        parameter(property.name)
+    inline fun <reified R : Any> param(): EagerDelegate<ParamRef<R>> = EagerDelegate { _, property ->
+        param(property.name)
     }
 
     /** Adds a lazily named parameter with an explicit type. */
-    fun <R : Any> parameter(type: KlassDesc<R>): EagerDelegate<ParamRef<R>> = EagerDelegate { _, property ->
-        parameter(property.name, type)
+    fun <R : Any> param(type: KlassDesc<R>): EagerDelegate<ParamRef<R>> = EagerDelegate { _, property ->
+        param(property.name, type)
     }
 
+    private var isInCode = false
     /** Starts or continues the code-emission block for this method. */
     fun code(body: CodeScope<O, R>.() -> Unit) {
+        if (isInCode) throw NestedCodeScopes(this)
+
+        isInCode = true
         canDefineParams = false
         val newParams = buildList {
             if (hasThis) add(receiver)
@@ -87,6 +91,7 @@ class MethodScope<O : Any, R : Any>(
 
         if (codeScope == null) codeScope = CodeScope(name, type, owner, newParams)
         codeScope?.body()
+        isInCode = false
     }
 
     /** Configures method access flags. */

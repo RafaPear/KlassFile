@@ -25,6 +25,7 @@ class CodeScope<O : Any, R : Any>(
     val params: List<ParamRef<*>>,
 ) : TypedRef<O, R> {
 
+    private val locals = LocalsStorage(params)
     private var instructions = mutableListOf<CodeBuilder.() -> Unit>()
     private var stack = Stack(this)
     private var hasReturn = false
@@ -48,6 +49,13 @@ class CodeScope<O : Any, R : Any>(
         instructions.add(block)
         isInsideRawBlock = false
     }
+
+    fun <T : Any> local(name: String, type: KlassDesc<T>) = locals.addLocal(name, type)
+
+    inline fun <reified T : Any> local(): EagerDelegate<LocalRef<T>> =
+        EagerDelegate { _, prop ->
+            local(prop.name, klassDescOf<T>())
+        }
 
     /**
      * Emits a `new` instruction for the given type.
@@ -92,17 +100,8 @@ class CodeScope<O : Any, R : Any>(
                 else -> areturn()
             }
         }
+        stack.setUnreachable()
     }
-
-    /**
-     * Resolves a parameter by local slot index.
-     *
-     * @param slot the local slot index.
-     * @return the matching parameter reference.
-     * @throws InvalidSlotIndexError if no parameter is mapped to [slot].
-     */
-    private fun getParam(slot: Int) = params.firstOrNull { it.order == slot }
-        ?: throw InvalidSlotIndexError(slot)
 
     /**
      * Loads the value stored in a local slot.
@@ -111,7 +110,7 @@ class CodeScope<O : Any, R : Any>(
      * @throws InvalidSlotIndexError if the slot does not exist.
      */
     fun load(slot: Int) {
-        val param = getParam(slot)
+        val param = locals.getLocal(slot)
         raw {
             when (param.type.classDesc) {
                 ConstantDescs.CD_int -> iload(slot)
@@ -123,6 +122,9 @@ class CodeScope<O : Any, R : Any>(
         }
         stack.pushStack(param)
     }
+
+    /** Loads a local slot by reference. */
+    inline fun <reified T : OrderedRef<*>> load(ref: T) = load(ref.order)
 
     /**
      * Loads the implicit receiver parameter.
@@ -142,7 +144,7 @@ class CodeScope<O : Any, R : Any>(
      * @throws InvalidSlotIndexError if the slot does not exist.
      */
     fun store(slot: Int) {
-        val param = getParam(slot)
+        val param = locals.getLocal(slot)
         stack.popStack(param.type)
 
         raw {
@@ -156,12 +158,9 @@ class CodeScope<O : Any, R : Any>(
         }
     }
 
-    /** Loads a local slot by reference. */
-    inline fun <reified T : ParamRef<*>> load(ref: T) = load(ref.order)
-
 
     /** Stores a value into a local slot by reference. */
-    inline fun <reified T : ParamRef<*>> store(ref: T) = store(ref.order)
+    inline fun <reified T : OrderedRef<*>> store(ref: T) = store(ref.order)
 
     /**
      * Increments an integer local slot in place.
@@ -171,7 +170,7 @@ class CodeScope<O : Any, R : Any>(
      * @throws UnsupportedOperationException if the slot is not backed by an `Int`.
      */
     fun inc(slot: Int, value: Int) {
-        val param = getParam(slot)
+        val param = locals.getLocal(slot)
         if (param.type.classDesc != ConstantDescs.CD_int) {
             throw UnsupportedOperationException("Increment operation is only supported for Int type parameters.")
         }
@@ -191,7 +190,7 @@ class CodeScope<O : Any, R : Any>(
      * @throws UnsupportedOperationException if the slot is not backed by an `Int`.
      */
     fun dec(slot: Int, value: Int) {
-        val param = getParam(slot)
+        val param = locals.getLocal(slot)
         if (param.type.classDesc != ConstantDescs.CD_int) {
             throw UnsupportedOperationException("Decrement operation is only supported for Int type parameters.")
         }
@@ -237,7 +236,7 @@ class CodeScope<O : Any, R : Any>(
      */
     fun loadRef(ref: TypedRef<*, *>) {
         when (ref) {
-            is ParamRef<*> -> load(ref)
+            is OrderedRef<*> -> load(ref)
             is FieldRef<*, *> -> {
                 loadReceiver()
                 getField(ref)
@@ -706,16 +705,48 @@ class CodeScope<O : Any, R : Any>(
         cmp()
     }
 
+    fun goto(label: LabelRef) {
+        label.setUnreachable(stack, this)
+
+        raw { goto_(label.getLabel()) }
+    }
+
+    fun label(name: String): LabelRef {
+        val ref = LabelRef(name)
+        raw { ref.setLabel(newLabel()) }
+        return ref
+    }
+
+    fun label(): EagerDelegate<LabelRef> = EagerDelegate { _, param -> label(param.name) }
+
+    fun LabelRef.bind() {
+        clearUnreachable(stack)
+        setBound()
+        raw { labelBinding(getLabel()) }
+    }
+
+//    fun condition(body: CodeScope<*, *>.() -> Unit): ConditionRef {
+//
+//        return ConditionRef(body)
+//    }
+//
+//    infix fun ConditionRef.then(body: CodeScope<*, *>.() -> Unit): ThenRef =
+//        ThenRef(this, body)
+//
+//    infix fun ThenRef.otherwise(body: CodeScope<*, *>.() -> Unit): OtherwiseRef =
+//        OtherwiseRef(this, body)
+
+
     fun KlassDesc<*>.toTypeKind(): TypeKind? =
         when (kClass) {
-            Boolean::class -> TypeKind.BooleanType
-            Byte::class -> TypeKind.ByteType
-            Char::class -> TypeKind.CharType
-            Short::class -> TypeKind.ShortType
-            Int::class -> TypeKind.IntType
-            Long::class -> TypeKind.LongType
-            Float::class -> TypeKind.FloatType
-            Double::class -> TypeKind.DoubleType
+            Boolean::class -> TypeKind.BOOLEAN
+            Byte::class -> TypeKind.BYTE
+            Char::class -> TypeKind.CHAR
+            Short::class -> TypeKind.SHORT
+            Int::class -> TypeKind.INT
+            Long::class -> TypeKind.LONG
+            Float::class -> TypeKind.FLOAT
+            Double::class -> TypeKind.DOUBLE
             else -> null
         }
 
@@ -878,16 +909,16 @@ class CodeScope<O : Any, R : Any>(
         name: String,
         owner: KlassDesc<O>,
         returnType: KlassDesc<R>,
-        builder: ParameterScope.() -> Unit,
+        builder: ArgumentScope.() -> Unit,
     ): MethodRef<O, R> {
-        val params = ParameterScope().apply(builder).build().toTypedArray()
+        val params = ArgumentScope().apply(builder).build().toTypedArray()
         return resolveMethod(name, owner, returnType, *params)
     }
 
     /** Lazily resolves a method reference using the current property name when omitted. */
     inline fun <reified O : Any, reified R : Any> findMethod(
         name: String? = null,
-        noinline builder: ParameterScope.() -> Unit,
+        noinline builder: ArgumentScope.() -> Unit,
     ) = EagerDelegate { _, property ->
         findMethod(name ?: property.name, klassDescOf<O>(), klassDescOf<R>(), builder)
     }
@@ -950,7 +981,7 @@ class CodeScope<O : Any, R : Any>(
      */
     fun <O : Any> instantiate(
         owner: KlassDesc<O>,
-        builder: ParameterScope.() -> Unit = {},
+        builder: ArgumentScope.() -> Unit = {},
     ) {
         new(owner)
         dup()
@@ -960,7 +991,7 @@ class CodeScope<O : Any, R : Any>(
 
     /** Instantiates a reified type and calls its constructor. */
     inline fun <reified O : Any> instantiate(
-        noinline builder: ParameterScope.() -> Unit = {},
+        noinline builder: ArgumentScope.() -> Unit = {},
     ) {
         instantiate(klassDescOf<O>(), builder)
     }
@@ -971,9 +1002,9 @@ class CodeScope<O : Any, R : Any>(
      * @param fieldRef the field to initialize.
      * @param builder parameter metadata used to resolve the constructor.
      */
-    inline fun <reified T : Any> instanciateField(
+    inline fun <reified T : Any> instantiateField(
         fieldRef: FieldRef<*, T>,
-        noinline builder: ParameterScope.() -> Unit,
+        noinline builder: ArgumentScope.() -> Unit,
     ) {
         val param = params.getOrNull(0)
             ?: throw NoParamFoundError("receiver for field ${fieldRef.name}")
@@ -1009,7 +1040,7 @@ class CodeScope<O : Any, R : Any>(
      */
     inline fun <reified O : Any, reified R : Any> invokeMethod(
         name: String,
-        noinline builder: ParameterScope.() -> Unit = {},
+        noinline builder: ArgumentScope.() -> Unit = {},
     ) {
 
         val methodRef by findMethod<O, R>(name, builder)
@@ -1339,14 +1370,11 @@ class CodeScope<O : Any, R : Any>(
      * @throws NoReturnError if no return instruction was emitted.
      */
     fun build(db: CodeBuilder) {
+        if (!hasReturn) throw NoReturnError(this)
+
+
         if (stack.isNotEmpty()) {
             throw StackNotEmptyError(this)
-        }
-
-        if (!hasReturn) {
-            println("[WARN]: " + NoReturnError(this).toString())
-            println("[WARN]: One was automatically added to the end of the method.")
-            ret()
         }
 
         for (instruction in instructions) db.instruction()

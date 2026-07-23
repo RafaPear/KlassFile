@@ -2,65 +2,44 @@ package pt.rafap
 
 import pt.rafap.klassfile.utils.klassFile
 
-abstract class ArrayTest {
-    abstract val size: Int
-    abstract operator fun get(idx: Int): Int
-    abstract operator fun set(idx: Int, value: Int)
+interface Sum {
+    fun sum(arr: IntArray): Int
 }
 
-fun buildArr(): ArrayTest {
-    val clazz by klassFile<ArrayTest> {
-
+fun buildArr(): Sum {
+    val clazz by klassFile<Sum> {
         access { public() }
 
-        val size by field<Int> { public() }
-        val array by field<IntArray>()
-
-        constructor {
+        method<Int>("sum") {
             access { public() }
 
-            code {
-                defaultCtor()
-
-                size.store {
-                    ldc(5)
-                }
-
-                array.store {
-                    size.load()
-                    newArray<Int>()
-                }
-                ret()
-            }
-        }
-
-        val getSize by getter(size)
-
-        method<Int>("get") {
-            access { public() }
-
-            val idx by parameter<Int>()
+            val arr by param<IntArray>()
 
             code {
-                array.load()
-                loadRef(idx)
-                arrayLoad()
+                val sum by local<Int>()
+                val idx by local<Int>()
+                val ref1 by label()
+                val ref2 by label()
+
+
+                ref1.bind()
+
+                ldc(0)
+                store(sum)
+
+                goto(ref1)
+
+                load(sum)
                 ret()
-            }
-        }
 
-        method<Unit>("set") {
-            access { public() }
+//                condition {
+//                    ldc(1)
+//                } then {
+//                    println<String> { ldc("0") }
+//                } otherwise {
+//                    println<String> { ldc("1") }
+//                }
 
-            val idx by parameter<Int>()
-            val value by parameter<Int>()
-
-            code {
-                array.load()
-                loadRef(idx)
-                loadRef(value)
-                arrayStore()
-                ret()
             }
         }
     }
@@ -71,11 +50,7 @@ fun buildArr(): ArrayTest {
 fun main() {
     val instance = buildArr()
 
-    for (i in 0 until instance.size) {
-        instance[i] = i * 10
-    }
-
-    for (i in 0 until instance.size) {
-        println("instance[$i] = ${instance[i]}")
-    }
+    val arr = intArrayOf(1, 2, 3, 4, 5)
+    val result = instance.sum(arr)
+    println(result)
 }

@@ -23,9 +23,6 @@
 | Control Flow (`if`, `goto`, loops, labels)   | ❌ Not implemented                                  |
 | Exception Handling (`try` / `catch`)         | ❌ Not implemented                                  |
 | Local Variables API                          | 🚧 Basic support                                   |
-| Stack Map Frames                             | ❌ Not implemented                                  |
-| Generics Metadata                            | ❌ Not implemented                                  |
-| Annotations                                  | ❌ Not implemented                                  |
 | Invokedynamic / Lambdas                      | ❌ Not implemented                                  |
 
 # Example

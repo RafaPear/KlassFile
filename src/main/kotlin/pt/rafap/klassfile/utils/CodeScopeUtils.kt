@@ -11,6 +11,6 @@ inline fun <reified T: Any> CodeScope<*, *>.println(
     builder()
 
     invokeMethod<PrintStream, Unit>("println") {
-        param<T>()
+        arg<T>()
     }
 }

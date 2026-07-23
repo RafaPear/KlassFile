@@ -2,6 +2,7 @@ package pt.rafap.klassfile.utils
 
 import pt.rafap.klassfile.builders.CodeScope
 import pt.rafap.klassfile.builders.FlagsScope
+import pt.rafap.klassfile.builders.MethodScope
 import pt.rafap.klassfile.models.InvokeType
 import pt.rafap.klassfile.models.MethodRef
 import pt.rafap.klassfile.models.StackValue
@@ -9,16 +10,24 @@ import pt.rafap.klassfile.models.StackValue
 /** Base type for all DSL validation and bytecode generation failures. */
 private val LIBRARY_PACKAGES = listOf(
     "pt.rafap.klassfile",
-    "jdk.internal.classfile",
-    "java.lang.classfile"
+    "java.lang.classfile",
+    "jdk.internal.classfile"
 )
 
 abstract class KlassFileError : RuntimeException() {
     override fun fillInStackTrace(): Throwable {
         super.fillInStackTrace()
-        stackTrace = stackTrace
-            .filterNot { clazz -> LIBRARY_PACKAGES.any { clazz.className.startsWith(it) } }
-            .toTypedArray()
+
+        val newStack = mutableListOf<StackTraceElement>()
+        for (elm in stackTrace) {
+
+            if (LIBRARY_PACKAGES.any { elm.className.lowercase().contains(it) })
+                continue
+
+            newStack.addLast(elm)
+        }
+
+        stackTrace = newStack.toTypedArray()
         return this
     }
 }
@@ -145,6 +154,16 @@ class NoReturnError(codeScope: CodeScope<*, *>) : KlassFileError() {
             "Please ensure that the code block has a return statement before finishing the scope."
 }
 
+class StackSizeMismatch(codeScope: CodeScope<*, *>, actual: Int, expected: Int) : KlassFileError() {
+    init {
+        codeScope.printStack()
+    }
+
+    override val message: String = "The stack at the goto target in '${codeScope.scopeName}' does not match the expected state. " +
+            "Expected $expected value(s) on the stack, but found $actual. " +
+            "All jumps to the same label must leave the operand stack in the same state."
+}
+
 class DuplicateAccessError(flagsScope: FlagsScope, access: Int, flag: Int) : KlassFileError() {
     override val message: String = "${flagsScope.scopeName} already has an access modifier " +
             "(${flagsScope.modifierName(access)}). Cannot also apply ${flagsScope.modifierName(flag)}."
@@ -166,4 +185,10 @@ class UnsupportedKotlinArrayOfPrimitivesError : KlassFileError() {
                 "On the JVM, Array<Int> is represented as Integer[], whereas primitive arrays are represented as int[], float[], etc.\n" +
                 "Because these are different JVM types, this library cannot infer the intended representation automatically.\n" +
                 "Use the corresponding primitive array type instead (e.g. IntArray, LongArray, FloatArray, DoubleArray, CharArray, BooleanArray, ByteArray or ShortArray).\n\n"
+}
+
+class NestedCodeScopes(methodScope: MethodScope<*, *>) : KlassFileError() {
+    override val message: String =
+        "A code block is being defined inside another code block in '${methodScope.name}'. " +
+                "Please define the inner code block outside of the outer one."
 }
