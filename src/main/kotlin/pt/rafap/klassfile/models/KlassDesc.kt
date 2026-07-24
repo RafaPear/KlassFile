@@ -37,7 +37,7 @@ open class KlassDesc<T : Any>(
     /** Creates a descriptor directly from a Kotlin [KClass]. */
     constructor(type: KClass<T>) : this(classDesc(type), type)
 
-    data class ArrayKlassDesc<T:Any> (val elementType: KlassDesc<T>) : KlassDesc<Array<T>>(
+    data class ArrayKlassDesc<T : Any>(val elementType: KlassDesc<T>) : KlassDesc<Array<T>>(
         classDesc = elementType.classDesc.arrayType(),
         kClass = Array::class as KClass<Array<T>>
     )
@@ -57,8 +57,13 @@ open class KlassDesc<T : Any>(
         val expected = kClass.java
         val actual = other.kClass.java
 
+        if (expected.isPrimitive && actual.isPrimitive) {
+
+        }
+
         if (expected.isPrimitive || actual.isPrimitive)
             return false
+
 
         return expected.isAssignableFrom(actual)
     }

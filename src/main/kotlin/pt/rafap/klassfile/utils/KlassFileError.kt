@@ -4,6 +4,7 @@ import pt.rafap.klassfile.builders.CodeScope
 import pt.rafap.klassfile.builders.FlagsScope
 import pt.rafap.klassfile.builders.MethodScope
 import pt.rafap.klassfile.models.InvokeType
+import pt.rafap.klassfile.models.KlassDesc
 import pt.rafap.klassfile.models.MethodRef
 import pt.rafap.klassfile.models.StackValue
 
@@ -14,9 +15,13 @@ private val LIBRARY_PACKAGES = listOf(
     "jdk.internal.classfile"
 )
 
+const val richErrorsEnabled = false
+
 abstract class KlassFileError : RuntimeException() {
     override fun fillInStackTrace(): Throwable {
         super.fillInStackTrace()
+
+        if (!richErrorsEnabled) return this
 
         val newStack = mutableListOf<StackTraceElement>()
         for (elm in stackTrace) {
@@ -99,14 +104,14 @@ class InvokeReferenceError(invokeType: InvokeType, ref: MethodRef<*, *>) : Klass
 }
 
 /** Thrown when code emission finishes with leftover stack values. */
-class StackUnderflowError(codeScope: CodeScope<*, *>, expected: StackValue?) : KlassFileError() {
+class StackUnderflowError(codeScope: CodeScope<*, *>, expected: KlassDesc<*>?) : KlassFileError() {
     init {
         codeScope.printStack()
     }
 
     override val message: String = buildString {
         append("The stack in '${codeScope.scopeName}' is empty and cannot be popped")
-        if (expected != null) append(", but a value of type '${expected.type.classDesc.displayName()}' was expected. ")
+        if (expected != null) append(", but a value of type '${expected.classDesc.displayName()}' was expected. ")
         else append(". ")
 
         append("Please ensure that the stack has enough elements before popping.")
@@ -114,15 +119,29 @@ class StackUnderflowError(codeScope: CodeScope<*, *>, expected: StackValue?) : K
 }
 
 /** Thrown when the simulated operand stack top has an unexpected type. */
-class StackTypeMismatchError(expected: StackValue, actual: StackValue, codeScope: CodeScope<*, *>) : KlassFileError() {
+class StackTypeMismatchError(expected: KlassDesc<*>, actual: KlassDesc<*>, codeScope: CodeScope<*, *>) : KlassFileError() {
+    init {
+        codeScope.printStack()
+    }
+
+    constructor(expected: StackValue, actual: StackValue, codeScope: CodeScope<*, *>) :
+            this(expected.type, actual.type, codeScope)
+
+    override val message: String =
+        "The stack in '${codeScope.scopeName}' has a type mismatch. " +
+                "Expected '${expected.classDesc.displayName()}', but found '${actual.classDesc.displayName()}'. " +
+                "Please ensure that the stack has the correct types before popping."
+}
+
+class StackReferenceTypeExpectedError(actual: StackValue, codeScope: CodeScope<*, *>) : KlassFileError() {
     init {
         codeScope.printStack()
     }
 
     override val message: String =
         "The stack in '${codeScope.scopeName}' has a type mismatch. " +
-                "Expected '${expected.type.classDesc.displayName()}', but found '${actual.type.classDesc.displayName()}'. " +
-                "Please ensure that the stack has the correct types before popping."
+                "Expected a reference type, but found '${actual.type.classDesc.displayName()}'. " +
+                "Please ensure that the stack has a reference type before popping."
 }
 
 /** Thrown when code completion is attempted with a non-empty stack. */
@@ -163,6 +182,8 @@ class StackSizeMismatch(codeScope: CodeScope<*, *>, actual: Int, expected: Int) 
             "Expected $expected value(s) on the stack, but found $actual. " +
             "All jumps to the same label must leave the operand stack in the same state."
 }
+
+class If
 
 class DuplicateAccessError(flagsScope: FlagsScope, access: Int, flag: Int) : KlassFileError() {
     override val message: String = "${flagsScope.scopeName} already has an access modifier " +

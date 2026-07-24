@@ -20,10 +20,10 @@
 | Inheritance                                  | 🚧 Supports either one superclass or one interface |
 | Bytecode DSL                                 | 🚧 In Progress                                     |
 | JVM Instruction Set                          | 🚧 Incomplete                                      |
-| Control Flow (`if`, `goto`, loops, labels)   | 🚧 In Progress (Implemented: labels and `goto`)    |
+| Control Flow (`if`, `goto`, loops, labels)   | ✅ Complete                                         |
 | Exception Handling (`try` / `catch`)         | ❌ Not implemented                                  |
 | Local Variables API                          | ✅ Complete                                         |
-| Invokedynamic / Lambdas                      | ❌ Not implemented                                  |
+| Invokedynamic / Lambdas                      | ❌ Not Planed                                       |
 
 # Example
 

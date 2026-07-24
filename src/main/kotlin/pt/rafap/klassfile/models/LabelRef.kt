@@ -9,7 +9,10 @@ data class LabelRef(val name: String) {
     private var stackSizeCapture: Int? = null
     private var internalLabel: Label? = null
     private var isBound = false
+    var boundIdx = -1
+        private set
     private var didSetUnreachable = false
+    private var isIf = false
 
     internal fun getLabel(): Label {
         return internalLabel ?: error("Label not initialized")
@@ -27,7 +30,7 @@ data class LabelRef(val name: String) {
         return internalLabel != null
     }
 
-    internal fun setUnreachable(stack: Stack, scope: CodeScope<*, *>) {
+    internal fun performGoto(stack: Stack, scope: CodeScope<*, *>) {
         if (!stack.isUnreachable() && !isBound) {
             stack.setUnreachable()
             didSetUnreachable = true
@@ -41,8 +44,29 @@ data class LabelRef(val name: String) {
         }
     }
 
-    internal fun clearUnreachable(stack: Stack) {
+    internal fun performIf(stack: Stack, scope: CodeScope<*, *>) {
+        isIf = true
+        if (!stack.isUnreachable() && !isBound) {
+            stack.mark()
+        } else if (isBound) {
+            val expectedSize = stackSizeCapture ?: return
+            val actualSize = stack.size
+
+            if (actualSize != expectedSize) {
+                throw StackSizeMismatch(scope, actualSize, expectedSize)
+            }
+        }
+    }
+
+    internal fun performBiding(stack: Stack, idx: Int) {
+        boundIdx = idx
         stackSizeCapture = stack.size
+
+        if (isIf) {
+            stack.resetToMark()
+            stack.clearUnreachable()
+            return
+        }
 
         if (didSetUnreachable) {
             stack.clearUnreachable()
@@ -52,20 +76,3 @@ data class LabelRef(val name: String) {
 
     internal fun isBound() = isBound
 }
-
-data class ConditionRef(
-    val condition: CodeScope<*, *>.() -> Unit,
-    //val label: LabelRef
-)
-
-data class ThenRef(
-    val conditionRef: ConditionRef,
-    //val label: LabelRef,
-    val then: CodeScope<*, *>.() -> Unit,
-)
-
-data class OtherwiseRef(
-    val thenRef: ThenRef,
-    //val label: LabelRef,
-    val otherwise: CodeScope<*, *>.() -> Unit,
-)

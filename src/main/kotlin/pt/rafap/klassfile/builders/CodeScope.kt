@@ -1,6 +1,7 @@
 package pt.rafap.klassfile.builders
 
 import pt.rafap.klassfile.models.*
+import pt.rafap.klassfile.models.StackType.Companion.stackType
 import pt.rafap.klassfile.utils.*
 import java.lang.classfile.ClassFile.ACC_STATIC
 import java.lang.classfile.CodeBuilder
@@ -32,7 +33,7 @@ class CodeScope<O : Any, R : Any>(
 
     /** Prints the tracked value and invocation traces for debugging. */
     fun printStack() {
-        stack.printStack()
+        stack.print()
     }
 
     private var isInsideRawBlock = false
@@ -57,6 +58,11 @@ class CodeScope<O : Any, R : Any>(
             local(prop.name, klassDescOf<T>())
         }
 
+    inline infix fun <reified T : Any> LocalRef<T>.set(value: T) {
+        ldc(value)
+        store(this)
+    }
+
     /**
      * Emits a `new` instruction for the given type.
      *
@@ -64,7 +70,7 @@ class CodeScope<O : Any, R : Any>(
      */
     fun <T : Any> new(type: KlassDesc<T>) {
         raw { new_(type.classDesc) }
-        stack.pushStack(StackValue.NewObject(type))
+        stack.push(StackValue.Reference.NewObject(type))
     }
 
     /**
@@ -87,17 +93,17 @@ class CodeScope<O : Any, R : Any>(
     /** Emits the appropriate return instruction for the declared return type. */
     fun ret() {
         hasReturn = true
-        if (type.classDesc != klassDescOf<Unit>().classDesc)
-            stack.popStack(type)
+        if (type.stackType != StackType.VOID)
+            stack.pop(type)
 
         raw {
-            when (type.classDesc) {
-                ConstantDescs.CD_void -> return_()
-                ConstantDescs.CD_int -> ireturn()
-                ConstantDescs.CD_long -> lreturn()
-                ConstantDescs.CD_float -> freturn()
-                ConstantDescs.CD_double -> dreturn()
-                else -> areturn()
+            when (type.stackType) {
+                StackType.INT -> ireturn()
+                StackType.LONG -> lreturn()
+                StackType.FLOAT -> freturn()
+                StackType.DOUBLE -> dreturn()
+                StackType.REFERENCE -> areturn()
+                StackType.VOID -> return_()
             }
         }
         stack.setUnreachable()
@@ -120,7 +126,7 @@ class CodeScope<O : Any, R : Any>(
                 else -> aload(slot)
             }
         }
-        stack.pushStack(param)
+        stack.push(param)
     }
 
     /** Loads a local slot by reference. */
@@ -145,7 +151,7 @@ class CodeScope<O : Any, R : Any>(
      */
     fun store(slot: Int) {
         val param = locals.getLocal(slot)
-        stack.popStack(param.type)
+        stack.pop(param.type)
 
         raw {
             when (param.type.classDesc) {
@@ -179,8 +185,7 @@ class CodeScope<O : Any, R : Any>(
     }
 
     /** Increments an integer parameter or slot in place. */
-    inline fun <reified T : ParamRef<*>> inc(ref: T, value: Int = 1) =
-        inc(ref.order, value)
+    fun inc(ref: OrderedRef<Int>, value: Int = 1) = inc(ref.order, value)
 
     /**
      * Decrements an integer local slot in place.
@@ -210,9 +215,9 @@ class CodeScope<O : Any, R : Any>(
      * @throws UnsupportedOperationException if the operand type is not supported.
      */
     fun add() {
-        val top = stack.popStack()
+        val top = stack.pop()
         val topType = top.type.kClass
-        val second = stack.popStack()
+        val second = stack.pop()
         val secondType = second.type.kClass
 
         if (topType != secondType)
@@ -226,7 +231,7 @@ class CodeScope<O : Any, R : Any>(
             else -> throw UnsupportedOperationException("Add operation not supported for type: ${topType.simpleName}")
         }
 
-        stack.pushStack(second)
+        stack.push(second)
     }
 
     /**
@@ -260,9 +265,9 @@ class CodeScope<O : Any, R : Any>(
      * @throws UnsupportedOperationException if the operand type is not supported.
      */
     fun sub() {
-        val top = stack.popStack()
+        val top = stack.pop()
         val topType = top.type.kClass
-        val second = stack.popStack()
+        val second = stack.pop()
         val secondType = second.type.kClass
 
         if (topType != secondType)
@@ -277,7 +282,7 @@ class CodeScope<O : Any, R : Any>(
             else -> throw UnsupportedOperationException("Sub operation not supported for type: ${topType.simpleName}")
         }
 
-        stack.pushStack(second)
+        stack.push(second)
     }
 
     /** Loads two values and subtracts them. */
@@ -294,9 +299,9 @@ class CodeScope<O : Any, R : Any>(
      * @throws UnsupportedOperationException if the operand type is not supported.
      */
     fun mul() {
-        val top = stack.popStack()
+        val top = stack.pop()
         val topType = top.type.kClass
-        val second = stack.popStack()
+        val second = stack.pop()
         val secondType = second.type.kClass
 
         if (topType != secondType)
@@ -309,7 +314,7 @@ class CodeScope<O : Any, R : Any>(
             Double::class -> raw { dmul() }
             else -> throw UnsupportedOperationException("Mul operation not supported for type: ${topType.simpleName}")
         }
-        stack.pushStack(second)
+        stack.push(second)
     }
 
     /** Loads two values and multiplies them
@@ -329,9 +334,9 @@ class CodeScope<O : Any, R : Any>(
      * @throws UnsupportedOperationException if the operand type is not supported.
      */
     fun div() {
-        val top = stack.popStack()
+        val top = stack.pop()
         val topType = top.type.kClass
-        val second = stack.popStack()
+        val second = stack.pop()
         val secondType = second.type.kClass
 
         if (topType != secondType)
@@ -346,7 +351,7 @@ class CodeScope<O : Any, R : Any>(
             else -> throw UnsupportedOperationException("Div operation not supported for type: ${topType.simpleName}")
         }
 
-        stack.pushStack(second)
+        stack.push(second)
     }
 
     /** Loads two values and divides them. */
@@ -363,9 +368,9 @@ class CodeScope<O : Any, R : Any>(
      * @throws UnsupportedOperationException if the operand type is not supported.
      */
     fun rem() {
-        val top = stack.popStack()
+        val top = stack.pop()
         val topType = top.type.kClass
-        val second = stack.popStack()
+        val second = stack.pop()
         val secondType = second.type.kClass
 
         if (topType != secondType)
@@ -379,7 +384,7 @@ class CodeScope<O : Any, R : Any>(
             else -> throw UnsupportedOperationException("Rem operation not supported for type: ${topType.simpleName}")
         }
 
-        stack.pushStack(second)
+        stack.push(second)
     }
 
     /** Loads two values and takes the remainder. */
@@ -395,7 +400,7 @@ class CodeScope<O : Any, R : Any>(
      * @throws UnsupportedOperationException if the operand type is not supported.
      */
     fun neg() {
-        val top = stack.popStack()
+        val top = stack.pop()
         when (val topType = top.type.kClass) {
             Int::class -> raw { ineg() }
             Long::class -> raw { lneg() }
@@ -404,7 +409,7 @@ class CodeScope<O : Any, R : Any>(
             else -> throw UnsupportedOperationException("Neg operation not supported for type: ${topType.simpleName}")
         }
 
-        stack.pushStack(top)
+        stack.push(top)
     }
 
     /** Takes the negative of a value */
@@ -420,9 +425,9 @@ class CodeScope<O : Any, R : Any>(
      */
     fun shl() {
         // Shift
-        stack.popStack(klassDescOf<Int>())
+        stack.pop(klassDescOf<Int>())
 
-        val top = stack.popStack()
+        val top = stack.pop()
         val topType = top.type.kClass
 
         when (topType) {
@@ -431,7 +436,7 @@ class CodeScope<O : Any, R : Any>(
             else -> throw UnsupportedOperationException("Shl operation not supported for type: ${topType.simpleName}")
         }
 
-        stack.pushStack(top)
+        stack.push(top)
     }
 
     /** Loads two values and shifts the first left by the second. */
@@ -455,9 +460,9 @@ class CodeScope<O : Any, R : Any>(
      */
     fun shr() {
         // Shift
-        stack.popStack(klassDescOf<Int>())
+        stack.pop(klassDescOf<Int>())
 
-        val top = stack.popStack()
+        val top = stack.pop()
         val topType = top.type.kClass
 
         when (topType) {
@@ -466,7 +471,7 @@ class CodeScope<O : Any, R : Any>(
             else -> throw UnsupportedOperationException("Shr operation not supported for type: ${topType.simpleName}")
         }
 
-        stack.pushStack(top)
+        stack.push(top)
     }
 
     /** Loads two values and shifts the first right by the second. */
@@ -490,9 +495,9 @@ class CodeScope<O : Any, R : Any>(
      */
     fun uShr() {
         // Shift
-        stack.popStack(klassDescOf<Int>())
+        stack.pop(klassDescOf<Int>())
 
-        val top = stack.popStack()
+        val top = stack.pop()
         val topType = top.type.kClass
 
         when (topType) {
@@ -501,7 +506,7 @@ class CodeScope<O : Any, R : Any>(
             else -> throw UnsupportedOperationException("uShr operation not supported for type: ${topType.simpleName}")
         }
 
-        stack.pushStack(top)
+        stack.push(top)
     }
 
     /** Loads two values and shifts the first right by the second. */
@@ -525,9 +530,9 @@ class CodeScope<O : Any, R : Any>(
      * @throws UnsupportedOperationException if the operand type is not supported.
      */
     fun and() {
-        val top = stack.popStack()
+        val top = stack.pop()
         val topType = top.type.kClass
-        val second = stack.popStack()
+        val second = stack.pop()
         val secondType = second.type.kClass
 
         if (topType != secondType)
@@ -539,7 +544,7 @@ class CodeScope<O : Any, R : Any>(
             else -> throw UnsupportedOperationException("And operation not supported for type: ${topType.simpleName}")
         }
 
-        stack.pushStack(second)
+        stack.push(second)
     }
 
     /** Loads two values and calculates the bitwise AND. */
@@ -556,9 +561,9 @@ class CodeScope<O : Any, R : Any>(
      * @throws UnsupportedOperationException if the operand type is not supported.
      */
     fun or() {
-        val top = stack.popStack()
+        val top = stack.pop()
         val topType = top.type.kClass
-        val second = stack.popStack()
+        val second = stack.pop()
         val secondType = second.type.kClass
 
         if (topType != secondType)
@@ -570,7 +575,7 @@ class CodeScope<O : Any, R : Any>(
             else -> throw UnsupportedOperationException("Or operation not supported for type: ${topType.simpleName}")
         }
 
-        stack.pushStack(second)
+        stack.push(second)
     }
 
     /** Loads two values or calculates the bitwise OR. */
@@ -587,9 +592,9 @@ class CodeScope<O : Any, R : Any>(
      * @throws UnsupportedOperationException if the operand type is not supported.
      */
     fun xor() {
-        val top = stack.popStack()
+        val top = stack.pop()
         val topType = top.type.kClass
-        val second = stack.popStack()
+        val second = stack.pop()
         val secondType = second.type.kClass
 
         if (topType != secondType)
@@ -601,7 +606,7 @@ class CodeScope<O : Any, R : Any>(
             else -> throw UnsupportedOperationException("Xor operation not supported for type: ${topType.simpleName}")
         }
 
-        stack.pushStack(second)
+        stack.push(second)
     }
 
     /** Loads two values xor calculates the bitwise XOR. */
@@ -617,7 +622,7 @@ class CodeScope<O : Any, R : Any>(
      * @throws UnsupportedOperationException if the operand type is not supported.
      */
     fun convert(destType: KClass<*>) {
-        val top = stack.popStack()
+        val top = stack.pop()
         val topType = top.type.kClass
 
         when (topType) {
@@ -668,7 +673,7 @@ class CodeScope<O : Any, R : Any>(
             else -> destType
         }
 
-        stack.pushStack(top.withType(KlassDesc(resultType)))
+        stack.push(top.withType(KlassDesc(resultType)))
     }
 
     inline fun <reified T : Any> convert() = convert(T::class)
@@ -680,9 +685,9 @@ class CodeScope<O : Any, R : Any>(
      * @throws UnsupportedOperationException if the operand type is not supported.
      */
     fun cmp() {
-        val top = stack.popStack()
+        val top = stack.pop()
         val topType = top.type.kClass
-        val second = stack.popStack()
+        val second = stack.pop()
         val secondType = second.type.kClass
 
         if (topType != secondType)
@@ -695,7 +700,7 @@ class CodeScope<O : Any, R : Any>(
             else -> throw UnsupportedOperationException("Cmp operation not supported for type: ${topType.simpleName}")
         }
 
-        stack.pushStack(top.withType(KlassDesc(Int::class)))
+        stack.push(top.withType(KlassDesc(Int::class)))
     }
 
     /** Loads two values and compares them. */
@@ -706,7 +711,7 @@ class CodeScope<O : Any, R : Any>(
     }
 
     fun goto(label: LabelRef) {
-        label.setUnreachable(stack, this)
+        label.performGoto(stack, this)
 
         raw { goto_(label.getLabel()) }
     }
@@ -720,22 +725,12 @@ class CodeScope<O : Any, R : Any>(
     fun label(): EagerDelegate<LabelRef> = EagerDelegate { _, param -> label(param.name) }
 
     fun LabelRef.bind() {
-        clearUnreachable(stack)
+        if (isBound()) instructions.removeAt(boundIdx)
+        performBiding(stack, instructions.size)
         setBound()
+
         raw { labelBinding(getLabel()) }
     }
-
-//    fun condition(body: CodeScope<*, *>.() -> Unit): ConditionRef {
-//
-//        return ConditionRef(body)
-//    }
-//
-//    infix fun ConditionRef.then(body: CodeScope<*, *>.() -> Unit): ThenRef =
-//        ThenRef(this, body)
-//
-//    infix fun ThenRef.otherwise(body: CodeScope<*, *>.() -> Unit): OtherwiseRef =
-//        OtherwiseRef(this, body)
-
 
     fun KlassDesc<*>.toTypeKind(): TypeKind? =
         when (kClass) {
@@ -751,14 +746,14 @@ class CodeScope<O : Any, R : Any>(
         }
 
     fun newArray(type: KlassDesc<*>) {
-        stack.popStack(klassDescOf<Int>())
+        stack.pop(klassDescOf<Int>())
 
         val kind = type.toTypeKind()
 
         if (kind != null) raw { newarray(kind) }
         else raw { anewarray(type.classDesc) }
 
-        stack.pushStack(StackValue.NewArrayObject(type))
+        stack.push(StackValue.Reference.NewArrayObject(type))
     }
 
     fun newMultiArray(type: KlassDesc<*>, dimensions: Int) {
@@ -769,13 +764,13 @@ class CodeScope<O : Any, R : Any>(
         newArray(klassDescOf<T>())
 
     private fun popArray(): KlassDesc.ArrayKlassDesc<*> {
-        val value = stack.popStack()
+        val value = stack.pop()
 
         val array = value.type
         if (array !is KlassDesc.ArrayKlassDesc<*>) {
             throw StackTypeMismatchError(
-                StackValue.Unknown(klassDescOf<Array<*>>()),
-                value,
+                klassDescOf<Array<*>>(),
+                value.type,
                 this
             )
         }
@@ -786,11 +781,25 @@ class CodeScope<O : Any, R : Any>(
     fun arrayLength() {
         popArray()
         raw { arraylength() }
-        stack.pushStack(StackValue.Unknown(klassDescOf<Int>()))
+        stack.push(StackValue.KnownType(klassDescOf<Int>()))
     }
 
+    fun ParamRef<*>.length() {
+        load(this)
+        arrayLength()
+    }
+
+    /**
+     * Loads a value from an array at the specified index.
+     *
+     * ORDER:
+     * - The array reference is on top of the stack.
+     * - The index is below the array reference.
+     *
+     * @throws StackTypeMismatchError if the array type is not an array.
+     */
     fun arrayLoad() {
-        stack.popStack(klassDescOf<Int>()) // idx
+        stack.pop(klassDescOf<Int>()) // idx
         val elementType = popArray().elementType
 
         when (elementType.kClass) {
@@ -804,7 +813,7 @@ class CodeScope<O : Any, R : Any>(
             else -> raw { aaload() }
         }
 
-        stack.pushStack(StackValue.Unknown(elementType))
+        stack.push(StackValue.KnownType(elementType))
     }
 
     /**
@@ -813,14 +822,14 @@ class CodeScope<O : Any, R : Any>(
      * @throws StackTypeMismatchError if the value type does not match the array element type.
      */
     fun arrayStore() {
-        val value = stack.popStack()
-        stack.popStack(klassDescOf<Int>()) // idx
+        val value = stack.pop()
+        stack.pop(klassDescOf<Int>()) // idx
         val elementType = popArray().elementType
 
         if (elementType != value.type)
             throw StackTypeMismatchError(
-                StackValue.Unknown(elementType),
-                value,
+                elementType,
+                value.type,
                 this
             )
 
@@ -837,22 +846,22 @@ class CodeScope<O : Any, R : Any>(
     }
 
     fun checkCast(type: KlassDesc<*>) {
-        val value = stack.popStack()
+        val value = stack.pop()
 
         raw { checkcast(type.classDesc) }
 
-        stack.pushStack(value.withType(type))
+        stack.push(value.withType(type))
     }
 
     inline fun <reified T : Any> checkCast() =
         checkCast(klassDescOf<T>())
 
     fun instanceOf(type: KlassDesc<*>) {
-        stack.popStack()
+        stack.pop()
 
         raw { instanceOf(type.classDesc) }
 
-        stack.pushStack(StackValue.Unknown(klassDescOf<Int>()))
+        stack.push(StackValue.KnownType(klassDescOf<Int>()))
     }
 
     inline fun <reified T : Any> instanceOf() =
@@ -876,13 +885,13 @@ class CodeScope<O : Any, R : Any>(
             }
         }
 
-        stack.pushStack(StackValue.Constant(KlassDesc(kClass), constant))
+        stack.push(StackValue.Constant(KlassDesc(kClass), constant))
     }
 
     /** Emits `aconst_null`. */
     fun nullValue() {
         raw { aconst_null() }
-        stack.pushStack(StackValue.Null())
+        stack.push(StackValue.Reference.Null())
     }
 
     /**
@@ -1085,7 +1094,7 @@ class CodeScope<O : Any, R : Any>(
     fun getStatic(name: String, owner: KlassDesc<*>, type: KlassDesc<*>) {
         raw { getstatic(owner.classDesc, name, type.classDesc) }
 
-        stack.pushStack(StackValue.Field(FieldRef(name, owner, type, flags = ACC_STATIC)))
+        stack.push(StackValue.Field(FieldRef(name, owner, type, flags = ACC_STATIC)))
     }
 
     /**
@@ -1103,9 +1112,9 @@ class CodeScope<O : Any, R : Any>(
 
     /** Emits a `getfield` instruction. */
     fun getField(name: String, owner: KlassDesc<*>, type: KlassDesc<*>) {
-        stack.popStack(owner)
+        stack.pop(owner)
         raw { getfield(owner.classDesc, name, type.classDesc) }
-        stack.pushStack(StackValue.Field(FieldRef(name, owner, type, flags = 0)))
+        stack.push(StackValue.Field(FieldRef(name, owner, type, flags = 0)))
     }
 
     /** Loads either a static or instance field based on the reference metadata. */
@@ -1116,14 +1125,14 @@ class CodeScope<O : Any, R : Any>(
 
     /** Emits a `putstatic` instruction for the given field reference. */
     fun putStatic(ref: FieldRef<*, *>) {
-        stack.popStack(ref.type)
+        stack.pop(ref.type)
         raw { putstatic(ref.owner.classDesc, ref.name, ref.type.classDesc) }
     }
 
     /** Emits a `putfield` instruction. */
     fun putField(name: String, owner: KlassDesc<*>, type: KlassDesc<*>) {
-        stack.popStack(type)
-        stack.popStack(owner)
+        stack.pop(type)
+        stack.pop(owner)
         raw { putfield(owner.classDesc, name, type.classDesc) }
     }
 
@@ -1140,9 +1149,378 @@ class CodeScope<O : Any, R : Any>(
         putField(ref)
     }
 
+    fun ifEq(label: LabelRef) {
+        stack.pop(klassDescOf<Int>())
+        label.performIf(stack, this)
+
+        raw { ifeq(label.getLabel()) }
+    }
+
+    fun ifNe(label: LabelRef) {
+        stack.pop(klassDescOf<Int>())
+        label.performIf(stack, this)
+
+        raw { ifne(label.getLabel()) }
+    }
+
+    fun ifLt(label: LabelRef) {
+        stack.pop(klassDescOf<Int>())
+        label.performIf(stack, this)
+
+        raw { iflt(label.getLabel()) }
+    }
+
+    fun ifLe(label: LabelRef) {
+        stack.pop(klassDescOf<Int>())
+        label.performIf(stack, this)
+
+        raw { ifle(label.getLabel()) }
+    }
+
+    fun ifGt(label: LabelRef) {
+        stack.pop(klassDescOf<Int>())
+        label.performIf(stack, this)
+
+        raw { ifgt(label.getLabel()) }
+    }
+
+    fun ifGe(label: LabelRef) {
+        stack.pop(klassDescOf<Int>())
+        label.performIf(stack, this)
+
+        raw { ifge(label.getLabel()) }
+    }
+
+    fun ifICmpEq(label: LabelRef) {
+        stack.pop(klassDescOf<Int>())
+        stack.pop(klassDescOf<Int>())
+        label.performIf(stack, this)
+
+        raw { if_icmpeq(label.getLabel()) }
+    }
+
+    fun ifICmpNe(label: LabelRef) {
+        stack.pop(klassDescOf<Int>())
+        stack.pop(klassDescOf<Int>())
+        label.performIf(stack, this)
+
+        raw { if_icmpne(label.getLabel()) }
+    }
+
+    fun ifICmpLt(label: LabelRef) {
+        stack.pop(klassDescOf<Int>())
+        stack.pop(klassDescOf<Int>())
+        label.performIf(stack, this)
+
+        raw { if_icmplt(label.getLabel()) }
+    }
+
+    fun ifICmpLe(label: LabelRef) {
+        stack.pop(klassDescOf<Int>())
+        stack.pop(klassDescOf<Int>())
+        label.performIf(stack, this)
+
+        raw { if_icmple(label.getLabel()) }
+    }
+
+    fun ifICmpGt(label: LabelRef) {
+        stack.pop(klassDescOf<Int>())
+        stack.pop(klassDescOf<Int>())
+        label.performIf(stack, this)
+
+        raw { if_icmpgt(label.getLabel()) }
+    }
+
+    fun ifICmpGe(label: LabelRef) {
+        stack.pop(klassDescOf<Int>())
+        stack.pop(klassDescOf<Int>())
+        label.performIf(stack, this)
+
+        raw { if_icmpge(label.getLabel()) }
+    }
+
+    private fun checkReferenceInStack(count: Int) {
+        for (i in 0 until count) {
+            val value = stack.pop()
+            if (value !is StackValue.Reference)
+                throw StackReferenceTypeExpectedError(value, this)
+        }
+    }
+
+    fun ifACmpEq(label: LabelRef) {
+        checkReferenceInStack(2)
+        label.performIf(stack, this)
+
+        raw { if_acmpeq(label.getLabel()) }
+    }
+
+    fun ifACmpNe(label: LabelRef) {
+        checkReferenceInStack(2)
+
+        label.performIf(stack, this)
+        raw { if_acmpne(label.getLabel()) }
+    }
+
+    fun ifNull(label: LabelRef) {
+        checkReferenceInStack(1)
+
+        label.performIf(stack, this)
+        raw { ifnull(label.getLabel()) }
+    }
+
+    fun ifNonNull(label: LabelRef) {
+        checkReferenceInStack(1)
+
+        label.performIf(stack, this)
+        raw { ifnonnull(label.getLabel()) }
+    }
+
+    private fun parseIf(onRef: () -> Unit, onInt: () -> Unit) {
+        val first = stack.peek()
+        val second = stack.peek()
+
+        if (!first.stackType.isEqualTo(second.stackType)) {
+            throw StackTypeMismatchError(second.type, first.type, this)
+        }
+
+        if (first.stackType.isReference()) {
+            onRef()
+            return
+        }
+
+        if (first.stackType != StackType.INT) {
+            throw StackTypeMismatchError(klassDescOf<Int>(), first.type, this)
+        }
+
+        onInt()
+    }
+
+    fun ifCmpEq(label: LabelRef) {
+        parseIf(
+            onRef = { ifACmpEq(label) },
+            onInt = { ifICmpEq(label) }
+        )
+    }
+
+    fun ifCmpNe(label: LabelRef) {
+        parseIf(
+            onRef = { ifACmpNe(label) },
+            onInt = { ifICmpNe(label) }
+        )
+    }
+
+    fun ifCmpLt(label: LabelRef) {
+        parseIf(
+            onRef = { throw UnsupportedOperationException("Cannot perform 'ifCmpLt' on reference types.") },
+            onInt = { ifICmpLt(label) }
+        )
+    }
+
+    fun ifCmpLe(label: LabelRef) {
+        parseIf(
+            onRef = { throw UnsupportedOperationException("Cannot perform 'ifCmpLe' on reference types.") },
+            onInt = { ifICmpLe(label) }
+        )
+    }
+
+    fun ifCmpGt(label: LabelRef) {
+        parseIf(
+            onRef = { throw UnsupportedOperationException("Cannot perform 'ifCmpGt' on reference types.") },
+            onInt = { ifICmpGt(label) }
+        )
+    }
+
+    fun ifCmpGe(label: LabelRef) {
+        parseIf(
+            onRef = { throw UnsupportedOperationException("Cannot perform 'ifCmpGe' on reference types.") },
+            onInt = { ifICmpGe(label) }
+        )
+    }
+
+    fun ifCmpNull(label: LabelRef) {
+        parseIf(
+            onRef = { ifNull(label) },
+            onInt = { throw UnsupportedOperationException("Cannot perform 'ifCmpNull' on integer types.") }
+        )
+    }
+
+    fun ifCmpNonNull(label: LabelRef) {
+        parseIf(
+            onRef = { ifNonNull(label) },
+            onInt = { throw UnsupportedOperationException("Cannot perform 'ifCmpNonNull' on integer types.") }
+        )
+    }
+
+    infix fun OrderedRef<*>.eq(other: OrderedRef<*>): LabelRef {
+        val label by label()
+
+        loadRef(this)
+        loadRef(other)
+        ifCmpEq(label)
+        return label
+    }
+
+    infix fun OrderedRef<*>.eq(other: Int): LabelRef {
+        val label by label()
+
+        loadRef(this)
+        if (other == 0) ifEq(label)
+        else {
+            ldc(other)
+            ifCmpEq(label)
+        }
+        return label
+    }
+
+    infix fun OrderedRef<*>.ne(other: OrderedRef<*>): LabelRef {
+        val label by label()
+
+        loadRef(this)
+        loadRef(other)
+        ifCmpNe(label)
+        return label
+    }
+
+    infix fun OrderedRef<*>.ne(other: Int): LabelRef {
+        val label by label()
+
+        loadRef(this)
+        if (other == 0) ifNe(label)
+        else {
+            ldc(other)
+            ifCmpNe(label)
+        }
+        return label
+    }
+
+    infix fun OrderedRef<*>.lt(other: OrderedRef<*>): LabelRef {
+        val label by label()
+
+        loadRef(this)
+        loadRef(other)
+        ifCmpLt(label)
+        return label
+    }
+
+    infix fun OrderedRef<*>.lt(other: Int): LabelRef {
+        val label by label()
+
+        loadRef(this)
+        if (other == 0) ifLt(label)
+        else {
+            ldc(other)
+            ifCmpLt(label)
+        }
+        return label
+    }
+
+    infix fun OrderedRef<*>.le(other: OrderedRef<*>): LabelRef {
+        val label by label()
+
+        loadRef(this)
+        loadRef(other)
+        ifCmpLe(label)
+        return label
+    }
+
+    infix fun OrderedRef<*>.le(other: Int): LabelRef {
+        val label by label()
+
+        loadRef(this)
+        if (other == 0) ifLe(label)
+        else {
+            ldc(other)
+            ifCmpLe(label)
+        }
+        return label
+    }
+
+    infix fun OrderedRef<*>.gt(other: OrderedRef<*>): LabelRef {
+        val label by label()
+
+        loadRef(this)
+        loadRef(other)
+        ifCmpGt(label)
+        return label
+    }
+
+    infix fun OrderedRef<*>.gt(other: Int): LabelRef {
+        val label by label()
+
+        loadRef(this)
+        if (other == 0) ifGt(label)
+        else {
+            ldc(other)
+            ifCmpGt(label)
+        }
+        return label
+    }
+
+    infix fun OrderedRef<*>.ge(other: OrderedRef<*>): LabelRef {
+        val label by label()
+
+        loadRef(this)
+        loadRef(other)
+        ifCmpGe(label)
+        return label
+    }
+
+    infix fun OrderedRef<*>.ge(other: Int): LabelRef {
+        val label by label()
+
+        loadRef(this)
+        if (other == 0) ifGe(label)
+        else {
+            ldc(other)
+            ifCmpGe(label)
+        }
+        return label
+    }
+
+    fun OrderedRef<*>.isNull(): LabelRef {
+        val label by label()
+
+        loadRef(this)
+        ifCmpNull(label)
+        return label
+    }
+
+    fun OrderedRef<*>.isNonNull(): LabelRef {
+        val label by label()
+
+        loadRef(this)
+        ifCmpNonNull(label)
+        return label
+    }
+
+    fun if_(cond: LabelRef, body: CodeScope<O, R>.() -> Unit) {
+        body()
+        cond.bind()
+    }
+
+    fun while_(condition: CodeScope<O, R>.() -> LabelRef): WhileRef {
+        val condLabel by label()
+        val breakLabel by label()
+        condLabel.bind()
+
+        val bodyLabel = condition()
+        goto(breakLabel)
+
+        return WhileRef(condLabel, bodyLabel, breakLabel)
+    }
+
+    infix fun WhileRef.do_(body: CodeScope<O, R>.() -> Unit) {
+        bodyLabel.bind()
+        body()
+        goto(condLabel)
+        breakLabel.bind()
+    }
+
+    //////////////// NEEDS REFACTORING
+
     /** Emits `pop`. */
     fun pop() {
-        val top = stack.popStack()
+        val top = stack.pop()
 
         if (top.category != 1)
             error("pop requires a category 1 value.")
@@ -1152,14 +1530,14 @@ class CodeScope<O : Any, R : Any>(
 
     /** Emits `pop2`. */
     fun pop2() {
-        val top = stack.popStack()
+        val top = stack.pop()
 
         if (top.category == 2) {
             raw { pop2() }
             return
         }
 
-        val second = stack.popStack()
+        val second = stack.pop()
 
         if (second.category != 1)
             error("Invalid stack shape for pop2.")
@@ -1169,180 +1547,180 @@ class CodeScope<O : Any, R : Any>(
 
     /** Emits `dup`. */
     fun dup() {
-        val top = stack.popStack()
+        val top = stack.pop()
 
         if (top.category != 1)
             error("dup requires a category 1 value.")
 
         raw { dup() }
 
-        stack.pushStack(top)
-        stack.pushStack(top)
+        stack.push(top)
+        stack.push(top)
     }
 
     /** Emits `dup_x1`. */
     fun dupX1() {
-        val v1 = stack.popStack()
-        val v2 = stack.popStack()
+        val v1 = stack.pop()
+        val v2 = stack.pop()
 
         if (v1.category != 1 || v2.category != 1)
             error("dup_x1 requires two category 1 values.")
 
         raw { dup_x1() }
 
-        stack.pushStack(v1)
-        stack.pushStack(v2)
-        stack.pushStack(v1)
+        stack.push(v1)
+        stack.push(v2)
+        stack.push(v1)
     }
 
     /** Emits `dup_x2`. */
     fun dupX2() {
-        val v1 = stack.popStack()
+        val v1 = stack.pop()
 
         if (v1.category != 1)
             error("dup_x2 requires a category 1 value on top.")
 
-        val v2 = stack.popStack()
+        val v2 = stack.pop()
 
         if (v2.category == 2) {
             raw { dup_x2() }
 
-            stack.pushStack(v1)
-            stack.pushStack(v2)
-            stack.pushStack(v1)
+            stack.push(v1)
+            stack.push(v2)
+            stack.push(v1)
             return
         }
 
-        val v3 = stack.popStack()
+        val v3 = stack.pop()
 
         if (v2.category != 1 || v3.category != 1)
             error("Invalid stack shape for dup_x2.")
 
         raw { dup_x2() }
 
-        stack.pushStack(v1)
-        stack.pushStack(v3)
-        stack.pushStack(v2)
-        stack.pushStack(v1)
+        stack.push(v1)
+        stack.push(v3)
+        stack.push(v2)
+        stack.push(v1)
     }
 
     /** Emits `dup2`. */
     fun dup2() {
-        val v1 = stack.popStack()
+        val v1 = stack.pop()
 
         if (v1.category == 2) {
             raw { dup2() }
 
-            stack.pushStack(v1)
-            stack.pushStack(v1)
+            stack.push(v1)
+            stack.push(v1)
             return
         }
 
-        val v2 = stack.popStack()
+        val v2 = stack.pop()
 
         if (v2.category != 1)
             error("Invalid stack shape for dup2.")
 
         raw { dup2() }
 
-        stack.pushStack(v2)
-        stack.pushStack(v1)
-        stack.pushStack(v2)
-        stack.pushStack(v1)
+        stack.push(v2)
+        stack.push(v1)
+        stack.push(v2)
+        stack.push(v1)
     }
 
     /** Emits `dup2_x1`. */
     fun dup2X1() {
-        val v1 = stack.popStack()
+        val v1 = stack.pop()
 
         if (v1.category == 2) {
-            val v2 = stack.popStack()
+            val v2 = stack.pop()
 
             if (v2.category != 1)
                 error("Invalid stack shape for dup2_x1.")
 
             raw { dup2_x1() }
 
-            stack.pushStack(v1)
-            stack.pushStack(v2)
-            stack.pushStack(v1)
+            stack.push(v1)
+            stack.push(v2)
+            stack.push(v1)
             return
         }
 
-        val v2 = stack.popStack()
-        val v3 = stack.popStack()
+        val v2 = stack.pop()
+        val v3 = stack.pop()
 
         if (v2.category != 1 || v3.category != 1)
             error("Invalid stack shape for dup2_x1.")
 
         raw { dup2_x1() }
 
-        stack.pushStack(v2)
-        stack.pushStack(v1)
-        stack.pushStack(v3)
-        stack.pushStack(v2)
-        stack.pushStack(v1)
+        stack.push(v2)
+        stack.push(v1)
+        stack.push(v3)
+        stack.push(v2)
+        stack.push(v1)
     }
 
     /** Emits `dup2_x2`. */
     fun dup2X2() {
-        val v1 = stack.popStack()
+        val v1 = stack.pop()
 
         when (v1.category) {
             2 -> {
-                val v2 = stack.popStack()
+                val v2 = stack.pop()
 
                 if (v2.category == 2) {
                     raw { dup2_x2() }
 
-                    stack.pushStack(v1)
-                    stack.pushStack(v2)
-                    stack.pushStack(v1)
+                    stack.push(v1)
+                    stack.push(v2)
+                    stack.push(v1)
                 } else {
-                    val v3 = stack.popStack()
+                    val v3 = stack.pop()
 
                     if (v3.category != 1)
                         error("Invalid stack shape for dup2_x2.")
 
                     raw { dup2_x2() }
 
-                    stack.pushStack(v1)
-                    stack.pushStack(v3)
-                    stack.pushStack(v2)
-                    stack.pushStack(v1)
+                    stack.push(v1)
+                    stack.push(v3)
+                    stack.push(v2)
+                    stack.push(v1)
                 }
             }
 
             1 -> {
-                val v2 = stack.popStack()
+                val v2 = stack.pop()
 
                 if (v2.category != 1)
                     error("Invalid stack shape for dup2_x2.")
 
-                val v3 = stack.popStack()
+                val v3 = stack.pop()
 
                 if (v3.category == 2) {
                     raw { dup2_x2() }
 
-                    stack.pushStack(v2)
-                    stack.pushStack(v1)
-                    stack.pushStack(v3)
-                    stack.pushStack(v2)
-                    stack.pushStack(v1)
+                    stack.push(v2)
+                    stack.push(v1)
+                    stack.push(v3)
+                    stack.push(v2)
+                    stack.push(v1)
                 } else {
-                    val v4 = stack.popStack()
+                    val v4 = stack.pop()
 
                     if (v3.category != 1 || v4.category != 1)
                         error("Invalid stack shape for dup2_x2.")
 
                     raw { dup2_x2() }
 
-                    stack.pushStack(v2)
-                    stack.pushStack(v1)
-                    stack.pushStack(v4)
-                    stack.pushStack(v3)
-                    stack.pushStack(v2)
-                    stack.pushStack(v1)
+                    stack.push(v2)
+                    stack.push(v1)
+                    stack.push(v4)
+                    stack.push(v3)
+                    stack.push(v2)
+                    stack.push(v1)
                 }
             }
         }
@@ -1350,16 +1728,16 @@ class CodeScope<O : Any, R : Any>(
 
     /** Emits `swap`. */
     fun swap() {
-        val v1 = stack.popStack()
-        val v2 = stack.popStack()
+        val v1 = stack.pop()
+        val v2 = stack.pop()
 
         if (v1.category != 1 || v2.category != 1)
             error("swap requires two category 1 values.")
 
         raw { swap() }
 
-        stack.pushStack(v1)
-        stack.pushStack(v2)
+        stack.push(v1)
+        stack.push(v2)
     }
 
     /**

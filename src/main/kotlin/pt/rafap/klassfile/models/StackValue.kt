@@ -8,6 +8,7 @@ import pt.rafap.klassfile.utils.klassDescOf
  * The hierarchy is used to validate stack shape and value categories while bytecode is being emitted.
  */
 sealed class StackValue(open val type: KlassDesc<*>) {
+
     val category: Int
         get() = when (type.kClass) {
             Long::class, Double::class -> 2
@@ -17,14 +18,14 @@ sealed class StackValue(open val type: KlassDesc<*>) {
     fun withType(type: KlassDesc<*>): StackValue {
         return when (this) {
             is Constant -> Constant(type, value)
+            is KnownType -> KnownType(type)
             is Parameter -> Parameter(ref)
             is Local -> Local(ref)
             is Field -> Field(ref)
             is ReturnValue -> ReturnValue(ref)
-            is NewObject -> NewObject(type)
-            is NewArrayObject -> NewArrayObject(type as KlassDesc.ArrayKlassDesc<*>)
-            is Null -> Null()
-            is Unknown -> Unknown(type)
+            is Reference.NewObject -> Reference.NewObject(type)
+            is Reference.NewArrayObject -> Reference.NewArrayObject(type as KlassDesc.ArrayKlassDesc<*>)
+            is Reference.Null -> Reference.Null()
         }
     }
 
@@ -35,6 +36,14 @@ sealed class StackValue(open val type: KlassDesc<*>) {
     ) : StackValue(type) {
         /** Returns a debug representation including value and type. */
         override fun toString() = "$value: $type"
+    }
+
+    /** A known value with a specific type, but no associated constant or reference. */
+    data class KnownType(
+        override val type: KlassDesc<*>,
+    ) : StackValue(type) {
+        /** Returns a debug representation of the known value type. */
+        override fun toString() = "$type"
     }
 
     /** A value loaded from a method parameter. */
@@ -69,36 +78,32 @@ sealed class StackValue(open val type: KlassDesc<*>) {
         override fun toString() = "${ref.type.classDesc.displayName()} (return value of ${ref.name})"
     }
 
-    /** A freshly created object that has not yet been initialized. */
-    data class NewObject(
-        override val type: KlassDesc<*>,
-    ) : StackValue(type) {
-        /** Returns a debug representation of a newly created object value. */
-        override fun toString() = "${type.classDesc.displayName()} (new)"
-    }
+    sealed class Reference(override val type: KlassDesc<*>) : StackValue(type) {
 
-    data class NewArrayObject(
-        override val type: KlassDesc.ArrayKlassDesc<*>,
-    ) : StackValue(type) {
-        constructor(elementType: KlassDesc<*>) : this(elementType.array())
+        /** A freshly created object that has not yet been initialized. */
+        data class NewObject(
+            override val type: KlassDesc<*>,
+        ) : Reference(type) {
+            /** Returns a debug representation of a newly created object value. */
+            override fun toString() = "${type.classDesc.displayName()} (new)"
+        }
 
-        /** Returns a debug representation of a newly created array object value. */
-        override fun toString() = "${type.classDesc.displayName()} (new array)"
-    }
+        data class NewArrayObject(
+            override val type: KlassDesc.ArrayKlassDesc<*>,
+        ) : Reference(type) {
+            constructor(elementType: KlassDesc<*>) : this(elementType.array())
 
-    /** The explicit `null` reference value. */
-    data class Null(
-        val dummy: Unit = Unit,
-    ) : StackValue(klassDescOf<Any>()) {
-        /** Returns a debug representation of the null literal. */
-        override fun toString() = "null"
-    }
+            /** Returns a debug representation of a newly created array object value. */
+            override fun toString() = "${type.classDesc.displayName()} (new array)"
+        }
 
-    /** A placeholder value used when the precise type is not known yet. */
-    data class Unknown(
-        override val type: KlassDesc<*>,
-    ) : StackValue(type) {
-        /** Returns a debug representation of an unresolved value type. */
-        override fun toString() = "$type (unknown)"
+        /** The explicit `null` reference value. */
+        data class Null(
+            val dummy: Unit = Unit,
+        ) : Reference(klassDescOf<Any>()) {
+            /** Returns a debug representation of the null literal. */
+            override fun toString() = "null"
+        }
     }
 }
+

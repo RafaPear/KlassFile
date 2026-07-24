@@ -70,14 +70,17 @@ class KlassFileBuilder<O : Any> private constructor(
      */
 
    fun <T : Any> field(
+        name: String,
         type: KlassDesc<T>,
         access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
-    ): EagerDelegate<FieldRef<O, T>> = fieldScope.field(type, access)
+    ): FieldRef<O, T> = fieldScope.field(name, type, access)
 
     /** Adds a delegated field using a reified Kotlin type. */
     inline fun <reified T : Any> field(
         noinline access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
-    ) = field(klassDescOf<T>(), access)
+    ) = EagerDelegate { _, property ->
+        field(property.name, klassDescOf<T>(), access)
+    }
 
     /** Adds a method with an explicit name and type descriptor. */
 

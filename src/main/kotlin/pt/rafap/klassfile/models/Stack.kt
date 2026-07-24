@@ -1,6 +1,7 @@
 package pt.rafap.klassfile.models
 
 import pt.rafap.klassfile.builders.CodeScope
+import pt.rafap.klassfile.models.StackType.Companion.stackType
 import pt.rafap.klassfile.utils.StackTypeMismatchError
 import pt.rafap.klassfile.utils.StackUnderflowError
 import pt.rafap.klassfile.utils.StackVoidTypeError
@@ -11,6 +12,8 @@ class Stack(private val codeScope: CodeScope<*, *>) {
     private var stackTypes = mutableListOf<StackValue>()
     private var invocationTrace = mutableListOf<MethodRef<*, *>>()
     private var isUnreachable = false
+    private var markPos = 0
+
     val size: Int
         get() = stackTypes.size
 
@@ -23,6 +26,18 @@ class Stack(private val codeScope: CodeScope<*, *>) {
     }
 
     fun isUnreachable() = isUnreachable
+
+    fun mark() {
+        markPos = stackTypes.size
+    }
+
+    fun resetToMark() {
+        if (markPos < 0 || markPos > stackTypes.size) {
+            throw IllegalStateException("Invalid mark position: $markPos")
+        }
+
+        stackTypes = stackTypes.subList(0, markPos).toMutableList()
+    }
 
     /** Prints the tracked value trace for debugging. */
     fun printStackTypes() {
@@ -51,33 +66,33 @@ class Stack(private val codeScope: CodeScope<*, *>) {
     }
 
     /** Prints the tracked value and invocation traces for debugging. */
-    fun printStack() {
+    fun print() {
         printStackTypes()
         printInvocationTrace()
     }
 
     /** Records a value in the internal value trace when applicable. */
-    fun pushStack(stackValue: StackValue) {
+    fun push(stackValue: StackValue) {
         if (isUnreachable) return
         if (stackValue.type.classDesc == ConstantDescs.CD_void) return
         stackTypes.add(stackValue)
     }
 
-    fun pushStack(ref: OrderedRef<*>) {
+    fun push(ref: OrderedRef<*>) {
         when (ref) {
-            is ParamRef<*> -> pushStack(StackValue.Parameter(ref))
-            is LocalRef<*> -> pushStack(StackValue.Local(ref))
+            is ParamRef<*> -> push(StackValue.Parameter(ref))
+            is LocalRef<*> -> push(StackValue.Local(ref))
         }
     }
 
     /** Records a field value in the internal value trace. */
-    fun pushStack(ref: FieldRef<*, *>) {
-        pushStack(StackValue.Field(ref))
+    fun push(ref: FieldRef<*, *>) {
+        push(StackValue.Field(ref))
     }
 
     /** Records a method return value in the internal value trace. */
-    fun pushStack(ref: MethodRef<*, *>) {
-        pushStack(StackValue.ReturnValue(ref))
+    fun push(ref: MethodRef<*, *>) {
+        push(StackValue.ReturnValue(ref))
     }
 
     /**
@@ -86,8 +101,9 @@ class Stack(private val codeScope: CodeScope<*, *>) {
      * @return the most recent tracked value.
      * @throws StackUnderflowError when no values are available.
      */
-    fun popStack(): StackValue {
-        return stackTypes.removeLastOrNull() ?: throw StackUnderflowError(codeScope, null)
+    fun pop(): StackValue {
+        return stackTypes.removeLastOrNull()
+            ?: throw StackUnderflowError(codeScope, null)
     }
 
     /**
@@ -96,32 +112,41 @@ class Stack(private val codeScope: CodeScope<*, *>) {
      * @param expected the expected value type.
      * @return the removed value.
      */
-    fun popStack(expected: KlassDesc<*>): StackValue {
+    fun pop(expected: KlassDesc<*>): StackValue {
         if (expected.classDesc == ConstantDescs.CD_void)
             throw StackVoidTypeError(codeScope)
-        expectTop(StackValue.NewObject(expected))
+        expectTop(expected)
         return stackTypes.removeLast()
     }
+
+    fun peek() = stackTypes.lastOrNull()
+        ?: throw StackUnderflowError(codeScope, null)
 
     /** Applies invocation bookkeeping for a method call. */
     fun stackInvoke(ref: MethodRef<*, *>) {
         invocationTrace.add(ref)
         for (param in ref.params.asReversed()) {
-            popStack(param.type)
+            pop(param.type)
         }
         if (ref.invokeType != InvokeType.STATIC)
-            popStack(ref.owner)
+            pop(ref.owner)
 
-        pushStack(ref)
+        push(ref)
     }
 
     /** Validates the most recent tracked value against [expected]. */
-    private fun expectTop(expected: StackValue) {
+    private fun expectTop(expected: KlassDesc<*>) {
         val actual = stackTypes.lastOrNull()
             ?: throw StackUnderflowError(codeScope, expected)
 
-        if (!expected.type.isAssignableFrom(actual.type)) {
-            throw StackTypeMismatchError(expected, actual, codeScope)
+        if (actual.stackType.isEqualTo(expected.stackType)) return
+
+        if (actual.stackType.isPrimitive() != expected.stackType.isPrimitive()) {
+            throw StackTypeMismatchError(expected, actual.type, codeScope)
+        }
+
+        if (!expected.isAssignableFrom(actual.type)) {
+            throw StackTypeMismatchError(expected, actual.type, codeScope)
         }
     }
 
