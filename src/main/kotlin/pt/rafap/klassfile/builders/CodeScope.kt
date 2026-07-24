@@ -1494,8 +1494,11 @@ class CodeScope<O : Any, R : Any>(
     }
 
     fun if_(cond: LabelRef, body: CodeScope<O, R>.() -> Unit) {
-        body()
+        val skipLabel by label()
+        goto(skipLabel)
         cond.bind()
+        body()
+        skipLabel.bind()
     }
 
     fun while_(condition: CodeScope<O, R>.() -> LabelRef): WhileRef {

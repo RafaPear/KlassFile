@@ -1,36 +1,19 @@
-package pt.rafap.klassfile
+package pt.rafap.klassfile.examples
 
 import pt.rafap.klassfile.utils.klassFile
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class KlassFileBuilderTests {
+class ArrayExample {
 
-    interface Sum {
+    interface Accumulator {
         fun sum(arr: IntArray): Int
-        fun ge(a: Int, b: Int): Boolean
     }
 
-    fun buildArr(): Sum {
-        val clazz by klassFile<Sum> {
+    @Test
+    fun `Implement a sum interface that sums all numbers in a array`(){
+        val accumulator by klassFile<Accumulator> {
             access { public() }
-
-            method<Boolean>("ge") {
-                access { public() }
-
-                val a by param<Int>()
-                val b by param<Int>()
-
-                code {
-                    // a >= b
-                    if_(a ge 0) {
-                        ldc(0)
-                        ret()
-                    }
-                    ldc(1)
-                    ret()
-                }
-            }
 
             method<Int>("sum") {
                 access { public() }
@@ -67,13 +50,7 @@ class KlassFileBuilderTests {
             }
         }
 
-        return clazz.writeAndGetInstance()
-    }
-
-    @Test
-            /** Verifies that the KlassFile builder test scaffold is wired correctly. */
-    fun `build KlassFile builder`() {
-        val instance = buildArr()
+        val instance = accumulator.writeAndGetInstance()
         val arr = intArrayOf(1, 2, 3, 4, 5)
         assertEquals(15, instance.sum(arr))
     }
