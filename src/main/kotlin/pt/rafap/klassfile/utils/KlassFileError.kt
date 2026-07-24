@@ -15,7 +15,7 @@ private val LIBRARY_PACKAGES = listOf(
     "jdk.internal.classfile"
 )
 
-const val richErrorsEnabled = false
+const val richErrorsEnabled = true
 
 abstract class KlassFileError : RuntimeException() {
     override fun fillInStackTrace(): Throwable {

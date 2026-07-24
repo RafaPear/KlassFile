@@ -40,6 +40,14 @@ class FieldScope<O : Any>(val owner: KlassDesc<O>) {
         return fieldRef
     }
 
+    /** Adds a field with an explicit name and type. */
+    inline fun <reified T : Any> field(
+        name: String,
+        noinline access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
+    ): FieldRef<O, T> {
+        return field(name, klassDescOf(), access)
+    }
+
     /** Adds a delegated field whose name is inferred from the backing property. */
     inline fun <reified T : Any> field(
         noinline access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
