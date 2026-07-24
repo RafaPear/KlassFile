@@ -25,6 +25,39 @@
 | Local Variables API                          | ✅ Complete                                         |
 | Invokedynamic / Lambdas                      | ❌ Not Planed                                       |
 
+## Test Suite Status
+
+| Test Suite       | Status     |
+|------------------|------------|
+| Argument Scope   | ✅ Complete |
+| Field Scope      | ✅ Complete |
+| Flags Scope      | ✅ Complete |
+| Method Scope     | ⏳ Pending  |
+| Code Scope       | ⏳ Pending  |
+| Class Scope      | ⏳ Pending  |
+| Locals Storage   | ⏳ Pending  |
+| Stack            | ⏳ Pending  |
+| LabelRef         | ⏳ Pending  |
+| WhileRef         | ⏳ Pending  |
+| LocalRef         | ⏳ Pending  |
+| ParamRef         | ⏳ Pending  |
+| OrderedRef       | ⏳ Pending  |
+| TypedRef         | ⏳ Pending  |
+| FieldRef         | ⏳ Pending  |
+| MethodRef        | ⏳ Pending  |
+| KlassDesc        | ⏳ Pending  |
+| Invoke Type      | ⏳ Pending  |
+| Stack Type       | ⏳ Pending  |
+| Stack Value      | ⏳ Pending  |
+| Instruction      | ⏳ Pending  |
+| Method Resolver  | ⏳ Pending  |
+| ClassDesc Utils  | ⏳ Pending  |
+| CodeScope Utils  | ⏳ Pending  |
+| Eager Delegate   | ⏳ Pending  |
+| KlassFile Errors | ⏳ Pending  |
+| KlassFile Utils  | ⏳ Pending  |
+| MethodRef Utils  | ⏳ Pending  |
+
 # Example
 
 ```kotlin
