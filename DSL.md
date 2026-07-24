@@ -1,5 +1,7 @@
 # KlassFile DSL
 
+> ⚠️ INCREDIBLY OUTDATED. PLEASE DO NOT FOLLOW FOR NEWER CODE ⚠️
+
 ## Overview
 
 The **KlassFile DSL** is a Kotlin DSL for generating Java class files at runtime through the Java ClassFile API. It lets you describe a class structure declaratively—its name, flags, superclass, implemented interfaces, fields, methods, and bytecode instructions—while keeping the syntax Kotlin-friendly.
