@@ -18,7 +18,7 @@ class ArgumentScopeTest {
     fun `arg adds parameter`() {
         val scope = ArgumentScope()
 
-        val param = scope.arg<Int>("value")
+        val param = scope.arg<Int>()
 
         assertEquals(listOf(param), scope.build())
     }
@@ -27,26 +27,26 @@ class ArgumentScopeTest {
     fun `arguments preserve insertion order`() {
         val scope = ArgumentScope()
 
-        scope.arg<Int>("a")
-        scope.arg<String>("b")
-        scope.arg<Long>("c")
+        val a = scope.arg<Int>()
+        val b = scope.arg<String>()
+        val c = scope.arg<Long>()
 
         val args = scope.build()
 
-        assertEquals("a", args[0].name)
-        assertEquals("b", args[1].name)
-        assertEquals("c", args[2].name)
+        assertEquals(a, args[0])
+        assertEquals(b, args[1])
+        assertEquals(c, args[2])
     }
 
     @Test
     fun `reified arg infers type`() {
         val scope = ArgumentScope()
 
-        scope.arg<Int>("value")
+        val value = scope.arg<Int>()
 
         val arg = scope.build().single()
 
-        assertEquals("value", arg.name)
+        assertEquals(value, arg)
         assertEquals(klassDescOf<Int>(), arg.type)
     }
 }

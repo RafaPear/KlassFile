@@ -106,7 +106,7 @@ class InvokeReferenceError(invokeType: InvokeType, ref: MethodRef<*, *>) : Klass
 /** Thrown when code emission finishes with leftover stack values. */
 class StackUnderflowError(codeScope: CodeScope<*, *>, expected: KlassDesc<*>?) : KlassFileError() {
     init {
-        codeScope.printStack()
+        codeScope.printInfo()
     }
 
     override val message: String = buildString {
@@ -121,7 +121,7 @@ class StackUnderflowError(codeScope: CodeScope<*, *>, expected: KlassDesc<*>?) :
 /** Thrown when the simulated operand stack top has an unexpected type. */
 class StackTypeMismatchError(expected: KlassDesc<*>, actual: KlassDesc<*>, codeScope: CodeScope<*, *>) : KlassFileError() {
     init {
-        codeScope.printStack()
+        codeScope.printInfo()
     }
 
     constructor(expected: StackValue, actual: StackValue, codeScope: CodeScope<*, *>) :
@@ -135,7 +135,7 @@ class StackTypeMismatchError(expected: KlassDesc<*>, actual: KlassDesc<*>, codeS
 
 class StackReferenceTypeExpectedError(actual: StackValue, codeScope: CodeScope<*, *>) : KlassFileError() {
     init {
-        codeScope.printStack()
+        codeScope.printInfo()
     }
 
     override val message: String =
@@ -147,7 +147,7 @@ class StackReferenceTypeExpectedError(actual: StackValue, codeScope: CodeScope<*
 /** Thrown when code completion is attempted with a non-empty stack. */
 class StackNotEmptyError(codeScope: CodeScope<*, *>) : KlassFileError() {
     init {
-        codeScope.printStack()
+        codeScope.printInfo()
     }
 
     override val message: String = "The stack is not empty after executing '${codeScope.scopeName}'. " +
@@ -156,7 +156,7 @@ class StackNotEmptyError(codeScope: CodeScope<*, *>) : KlassFileError() {
 
 class StackVoidTypeError(codeScope: CodeScope<*, *>) : KlassFileError() {
     init {
-        codeScope.printStack()
+        codeScope.printInfo()
     }
 
     override val message: String = "Cannot pop stack for void type in '${codeScope.scopeName}'. " +
@@ -166,7 +166,7 @@ class StackVoidTypeError(codeScope: CodeScope<*, *>) : KlassFileError() {
 /** Thrown when a code block completes without emitting a return instruction. */
 class NoReturnError(codeScope: CodeScope<*, *>) : KlassFileError() {
     init {
-        codeScope.printStack()
+        codeScope.printInfo()
     }
 
     override val message: String = "The code block '${codeScope.scopeName}' does not have a return statement. " +
@@ -175,15 +175,13 @@ class NoReturnError(codeScope: CodeScope<*, *>) : KlassFileError() {
 
 class StackSizeMismatch(codeScope: CodeScope<*, *>, actual: Int, expected: Int) : KlassFileError() {
     init {
-        codeScope.printStack()
+        codeScope.printInfo()
     }
 
     override val message: String = "The stack at the goto target in '${codeScope.scopeName}' does not match the expected state. " +
             "Expected $expected value(s) on the stack, but found $actual. " +
             "All jumps to the same label must leave the operand stack in the same state."
 }
-
-class If
 
 class DuplicateAccessError(flagsScope: FlagsScope, access: Int, flag: Int) : KlassFileError() {
     override val message: String = "${flagsScope.scopeName} already has an access modifier " +

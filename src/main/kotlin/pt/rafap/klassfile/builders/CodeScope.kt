@@ -7,6 +7,7 @@ import java.lang.classfile.ClassFile.ACC_STATIC
 import java.lang.classfile.CodeBuilder
 import java.lang.classfile.TypeKind
 import java.lang.constant.ConstantDescs
+import kotlin.random.Random
 import kotlin.reflect.KClass
 
 
@@ -32,7 +33,8 @@ class CodeScope<O : Any, R : Any>(
     private var hasReturn = false
 
     /** Prints the tracked value and invocation traces for debugging. */
-    fun printStack() {
+    fun printInfo() {
+        locals.print()
         stack.print()
     }
 
@@ -60,6 +62,15 @@ class CodeScope<O : Any, R : Any>(
 
     inline infix fun <reified T : Any> LocalRef<T>.set(value: T) {
         ldc(value)
+        store(this)
+    }
+
+    inline infix fun <reified T : Any> LocalRef<T>.set(value: OrderedRef<T>) {
+        load(value)
+        store(this)
+    }
+
+    infix fun LocalRef<*>.set(value: Unit) {
         store(this)
     }
 
@@ -816,8 +827,36 @@ class CodeScope<O : Any, R : Any>(
         stack.push(StackValue.KnownType(elementType))
     }
 
+    operator fun <T : Any> OrderedRef<T>.get(idx: Int) {
+        load(this)
+        ldc(idx)
+        arrayLoad()
+    }
+
+    operator fun <T : Any> OrderedRef<T>.get(ref: OrderedRef<Int>) {
+        load(this)
+        load(ref)
+        arrayLoad()
+    }
+
+    inline operator fun <reified T : Any> OrderedRef<*>.set(idx: Int, value: T) {
+        load(this)
+        ldc(idx)
+        ldc(value)
+        arrayStore()
+    }
+
+    inline operator fun <reified T : Any> OrderedRef<*>.set(idx: OrderedRef<Int>, value: T) {
+        load(this)
+        load(idx)
+        ldc(value)
+        arrayStore()
+    }
+
     /**
      * Stores a value into an array at the specified index.
+     *
+     * ORDER: Value -> Idx -> Array
      *
      * @throws StackTypeMismatchError if the value type does not match the array element type.
      */
@@ -1372,6 +1411,25 @@ class CodeScope<O : Any, R : Any>(
         return label
     }
 
+    infix fun Unit.eq(other: OrderedRef<*>): LabelRef {
+        val label by label()
+
+        loadRef(other)
+        ifCmpEq(label)
+        return label
+    }
+
+    infix fun Unit.eq(other: Int): LabelRef {
+        val label by label()
+
+        if (other == 0) ifEq(label)
+        else {
+            ldc(other)
+            ifCmpEq(label)
+        }
+        return label
+    }
+
     infix fun OrderedRef<*>.ne(other: OrderedRef<*>): LabelRef {
         val label by label()
 
@@ -1385,6 +1443,25 @@ class CodeScope<O : Any, R : Any>(
         val label by label()
 
         loadRef(this)
+        if (other == 0) ifNe(label)
+        else {
+            ldc(other)
+            ifCmpNe(label)
+        }
+        return label
+    }
+
+    infix fun Unit.ne(other: OrderedRef<*>): LabelRef {
+        val label by label()
+
+        loadRef(other)
+        ifCmpNe(label)
+        return label
+    }
+
+    infix fun Unit.ne(other: Int): LabelRef {
+        val label by label()
+
         if (other == 0) ifNe(label)
         else {
             ldc(other)
@@ -1414,6 +1491,25 @@ class CodeScope<O : Any, R : Any>(
         return label
     }
 
+    infix fun Unit.lt(other: OrderedRef<*>): LabelRef {
+        val label by label()
+
+        loadRef(other)
+        ifCmpLt(label)
+        return label
+    }
+
+    infix fun Unit.lt(other: Int): LabelRef {
+        val label by label()
+
+        if (other == 0) ifLt(label)
+        else {
+            ldc(other)
+            ifCmpLt(label)
+        }
+        return label
+    }
+
     infix fun OrderedRef<*>.le(other: OrderedRef<*>): LabelRef {
         val label by label()
 
@@ -1427,6 +1523,25 @@ class CodeScope<O : Any, R : Any>(
         val label by label()
 
         loadRef(this)
+        if (other == 0) ifLe(label)
+        else {
+            ldc(other)
+            ifCmpLe(label)
+        }
+        return label
+    }
+
+    infix fun Unit.le(other: OrderedRef<*>): LabelRef {
+        val label by label()
+
+        loadRef(other)
+        ifCmpLe(label)
+        return label
+    }
+
+    infix fun Unit.le(other: Int): LabelRef {
+        val label by label()
+
         if (other == 0) ifLe(label)
         else {
             ldc(other)
@@ -1456,6 +1571,25 @@ class CodeScope<O : Any, R : Any>(
         return label
     }
 
+    infix fun Unit.gt(other: OrderedRef<*>): LabelRef {
+        val label by label()
+
+        loadRef(other)
+        ifCmpGt(label)
+        return label
+    }
+
+    infix fun Unit.gt(other: Int): LabelRef {
+        val label by label()
+
+        if (other == 0) ifGt(label)
+        else {
+            ldc(other)
+            ifCmpGt(label)
+        }
+        return label
+    }
+
     infix fun OrderedRef<*>.ge(other: OrderedRef<*>): LabelRef {
         val label by label()
 
@@ -1469,6 +1603,25 @@ class CodeScope<O : Any, R : Any>(
         val label by label()
 
         loadRef(this)
+        if (other == 0) ifGe(label)
+        else {
+            ldc(other)
+            ifCmpGe(label)
+        }
+        return label
+    }
+
+    infix fun Unit.ge(other: OrderedRef<*>): LabelRef {
+        val label by label()
+
+        loadRef(other)
+        ifCmpGe(label)
+        return label
+    }
+
+    infix fun Unit.ge(other: Int): LabelRef {
+        val label by label()
+
         if (other == 0) ifGe(label)
         else {
             ldc(other)
@@ -1515,6 +1668,120 @@ class CodeScope<O : Any, R : Any>(
     infix fun WhileRef.do_(body: CodeScope<O, R>.() -> Unit) {
         bodyLabel.bind()
         body()
+        goto(condLabel)
+        breakLabel.bind()
+    }
+
+
+    operator fun Int.rangeTo(other: OrderedRef<Int>) =
+        CustomRange.IntToRefRange(this, other)
+
+    infix fun Int.until(other: OrderedRef<Int>) =
+        CustomRange.IntToRefRange(this, other, false)
+
+    operator fun OrderedRef<Int>.rangeTo(other: Int) =
+        CustomRange.RefToIntRange(this, other)
+
+    infix fun OrderedRef<Int>.until(other: Int) =
+        CustomRange.RefToIntRange(this, other, false)
+
+    operator fun OrderedRef<Int>.rangeTo(other: OrderedRef<Int>) =
+        CustomRange.RefToRefRange(this, other)
+
+    infix fun OrderedRef<Int>.until(other: OrderedRef<Int>) =
+        CustomRange.RefToRefRange(this, other, false)
+
+    private fun CustomRange<*, *>.loadStart() {
+        when (this) {
+            is CustomRange.IntToRefRange -> ldc(start)
+            is CustomRange.RefToIntRange, is CustomRange.RefToRefRange -> loadRef(start)
+        }
+    }
+
+    private fun CustomRange<*, *>.loadEnd() {
+        when (this) {
+            is CustomRange.IntToRefRange, is CustomRange.RefToRefRange -> load(end)
+            is CustomRange.RefToIntRange -> ldc(end)
+        }
+    }
+
+    private fun ifCmpG(inclusive: Boolean, label: LabelRef) {
+        if (!inclusive) ifCmpGe(label)
+        else ifCmpGt(label)
+    }
+
+    infix fun OrderedRef<Int>.in_(range: CustomRange<*, *>): LabelRef {
+        val label by label()
+        loadRef(this)
+        range.loadStart()
+        ifCmpLt(label)
+        loadRef(this)
+        range.loadEnd()
+        ifCmpG(range.endInclusive, label)
+        return label
+    }
+
+    infix fun OrderedRef<Int>.in_(range: IntRange): LabelRef {
+        val label by label()
+        loadRef(this)
+        ldc(range.first)
+        ifCmpLt(label)
+        loadRef(this)
+        ldc(range.last)
+        ifCmpGt(label)
+        return label
+    }
+
+    fun for_(idx: LocalRef<Int>, condition: CodeScope<O, R>.(LocalRef<Int>) -> LabelRef): ForRef<O, R> {
+        val condLabel by label()
+        val bodyLabel by label()
+
+        condLabel.bind()
+
+        val breakLabel = condition(idx)
+        goto(bodyLabel)
+        return ForRef(condLabel, bodyLabel, breakLabel, idx)
+    }
+
+    fun for_(condition: CodeScope<O, R>.(LocalRef<Int>) -> LabelRef): ForRef<O, R> {
+        val idx by local<Int>()
+        idx set 0
+        return for_(idx, condition)
+    }
+
+    private fun CustomRange<*, *>.initLocal(idx: LocalRef<Int>) {
+        when (this) {
+            is CustomRange.IntToRefRange -> idx set start
+            is CustomRange.RefToIntRange, is CustomRange.RefToRefRange -> idx set load(start)
+        }
+    }
+
+    private fun generateForIdx(): LocalRef<Int> {
+        return local(Random.nextBytes(10).contentToString(), klassDescOf<Int>())
+    }
+
+    fun for_(range: CustomRange<*, *>): ForRef<O, R> {
+        val idx = generateForIdx()
+        range.initLocal(idx)
+
+        return for_(idx) { idx in_ range }
+    }
+
+    fun for_(range: IntRange): ForRef<O, R> {
+        val idx = generateForIdx()
+        idx set range.first
+
+        return for_(idx) { idx in_ range }
+    }
+
+    infix fun ForRef<O, R>.incrementor(incrementor: CodeScope<O, R>.() -> Unit): ForRef<O, R> {
+        return copy(incrementor = incrementor)
+    }
+
+    infix fun ForRef<O, R>.do_(body: CodeScope<O, R>.(LocalRef<Int>) -> Unit) {
+        bodyLabel.bind()
+        body(idx)
+        incrementor()
         goto(condLabel)
         breakLabel.bind()
     }
