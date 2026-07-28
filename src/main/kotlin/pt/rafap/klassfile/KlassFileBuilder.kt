@@ -58,7 +58,7 @@ class KlassFileBuilder<O : Any> private constructor(
      * Configures the access flags for the generated class using a [FlagsScope.ClassFlagsScope] DSL.
      */
 
-   fun access(builder: FlagsScope.ClassFlagsScope.() -> Unit) = flagsScope.builder()
+    fun access(builder: FlagsScope.ClassFlagsScope.() -> Unit) = flagsScope.builder()
 
     /**
      * Registers a field in the generated class with the specified type and access flags.
@@ -69,7 +69,7 @@ class KlassFileBuilder<O : Any> private constructor(
      * @param access a lambda to configure the field's access flags using [FlagsScope.FieldFlagsScope]. Defaults to `private`.
      */
 
-   fun <T : Any> field(
+    fun <T : Any> field(
         name: String,
         type: KlassDesc<T>,
         access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
@@ -84,7 +84,7 @@ class KlassFileBuilder<O : Any> private constructor(
 
     /** Adds a method with an explicit name and type descriptor. */
 
-   fun <R : Any> method(
+    fun <R : Any> method(
         name: String,
         type: KlassDesc<R>,
         invokeType: InvokeType = InvokeType.VIRTUAL,
@@ -104,7 +104,7 @@ class KlassFileBuilder<O : Any> private constructor(
 
     /** Adds a delegated method whose name is inferred from the backing property. */
 
-   fun <R : Any> method(
+    fun <R : Any> method(
         type: KlassDesc<R>,
         invokeType: InvokeType = InvokeType.VIRTUAL,
         builder: MethodScope<O, R>.() -> Unit,
@@ -128,7 +128,7 @@ class KlassFileBuilder<O : Any> private constructor(
      * @return a [MethodRef] describing the generated member.
      */
 
-   fun constructor(
+    fun constructor(
         builder: MethodScope<O, Unit>.() -> Unit = { access { public() }; code { defaultCtor(); ret() } },
     ): MethodRef<O, Unit> {
         hasNoArgsConstructor = true
@@ -137,26 +137,33 @@ class KlassFileBuilder<O : Any> private constructor(
 
     /** Generates a conventional getter name for a field reference. */
 
-   fun FieldRef<*, *>.genGetterName(): String {
+    fun FieldRef<*, *>.genGetterName(): String {
         return "get" + name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
 
     /** Generates a conventional setter name for a field reference. */
 
-   fun FieldRef<*, *>.genSetterName(): String {
+    fun FieldRef<*, *>.genSetterName(): String {
         return "set" + name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+    }
+
+    private fun getInvokeType(field: FieldRef<*, *>): InvokeType {
+        return when {
+            field.isStatic -> InvokeType.STATIC
+            else -> InvokeType.VIRTUAL
+        }
     }
 
     /** Creates a getter method that reads the provided field. */
 
-   fun <T : Any> getter(
+    fun <T : Any> getter(
         name: String,
         field: FieldRef<O, T>,
         access: FlagsScope.MethodFlagsScope.() -> Unit = { public() },
     ) = method(
         name,
         type = field.type,
-        invokeType = if (field.isStatic) InvokeType.STATIC else InvokeType.VIRTUAL
+        invokeType = getInvokeType(field),
     ) {
         access { access() }
 
@@ -177,11 +184,11 @@ class KlassFileBuilder<O : Any> private constructor(
 
     /** Creates a setter method that writes the provided field. */
 
-   fun <T : Any> setter(
+    fun <T : Any> setter(
         name: String,
         field: FieldRef<O, T>,
         access: FlagsScope.MethodFlagsScope.() -> Unit = { public() },
-    ) = method<Unit>(name, invokeType = if (field.isStatic) InvokeType.STATIC else InvokeType.VIRTUAL) {
+    ) = method<Unit>(name, invokeType = getInvokeType(field)) {
         val value by param(field.type)
 
         access { access() }
@@ -266,7 +273,7 @@ class KlassFileBuilder<O : Any> private constructor(
      * @return the generated class wrapper.
      */
 
-   fun klass(): Klass = Klass()
+    fun klass(): Klass = Klass()
 
 
     /**

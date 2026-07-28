@@ -1072,6 +1072,11 @@ class CodeScope<O : Any, R : Any>(
      * @param methodRef the method reference to invoke.
      */
     fun invokeMethod(methodRef: MethodRef<*, *>) {
+        if (methodRef.owner == owner && owner.kClass.java.isInterface) {
+            invokeInterface(methodRef.copy(invokeType = InvokeType.INTERFACE))
+            return
+        }
+
         when (methodRef.invokeType) {
             InvokeType.STATIC -> invokeStatic(methodRef)
             InvokeType.SPECIAL -> invokeSpecial(methodRef)
@@ -2019,7 +2024,6 @@ class CodeScope<O : Any, R : Any>(
      */
     fun build(db: CodeBuilder) {
         if (!hasReturn) throw NoReturnError(this)
-
 
         if (stack.isNotEmpty()) {
             throw StackNotEmptyError(this)
