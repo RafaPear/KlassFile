@@ -7,7 +7,6 @@ import java.lang.classfile.ClassFile.ACC_STATIC
 import java.lang.classfile.CodeBuilder
 import java.lang.classfile.TypeKind
 import java.lang.constant.ConstantDescs
-import kotlin.random.Random
 import kotlin.reflect.KClass
 
 
@@ -141,7 +140,12 @@ class CodeScope<O : Any, R : Any>(
     }
 
     /** Loads a local slot by reference. */
-    inline fun <reified T : OrderedRef<*>> load(ref: T) = load(ref.order)
+    inline fun <reified T : OrderedRef<*>> load(ref: T) {
+        load(ref.order)
+        if (ref is LocalRef<*> && !ref.isInitialized)
+            throw UninitializedLocalVariableError(ref, this)
+
+    }
 
     /**
      * Loads the implicit receiver parameter.
@@ -177,7 +181,12 @@ class CodeScope<O : Any, R : Any>(
 
 
     /** Stores a value into a local slot by reference. */
-    inline fun <reified T : OrderedRef<*>> store(ref: T) = store(ref.order)
+    inline fun <reified T : OrderedRef<*>> store(ref: T) {
+        store(ref.order)
+        if (ref is LocalRef<*> && !ref.isInitialized) {
+            ref.isInitialized = true
+        }
+    }
 
     /**
      * Increments an integer local slot in place.
@@ -1761,8 +1770,9 @@ class CodeScope<O : Any, R : Any>(
         }
     }
 
+    private var counter = 0
     private fun generateForIdx(): LocalRef<Int> {
-        return local(Random.nextBytes(10).contentToString(), klassDescOf<Int>())
+        return local("for_$counter", klassDescOf<Int>())
     }
 
     fun for_(range: CustomRange<*, *>): ForRef<O, R> {

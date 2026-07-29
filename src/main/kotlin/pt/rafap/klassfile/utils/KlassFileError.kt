@@ -5,6 +5,7 @@ import pt.rafap.klassfile.builders.FlagsScope
 import pt.rafap.klassfile.builders.MethodScope
 import pt.rafap.klassfile.models.InvokeType
 import pt.rafap.klassfile.models.KlassDesc
+import pt.rafap.klassfile.models.LocalRef
 import pt.rafap.klassfile.models.MethodRef
 import pt.rafap.klassfile.models.StackValue
 
@@ -171,6 +172,15 @@ class NoReturnError(codeScope: CodeScope<*, *>) : KlassFileError() {
 
     override val message: String = "The code block '${codeScope.scopeName}' does not have a return statement. " +
             "Please ensure that the code block has a return statement before finishing the scope."
+}
+
+class UninitializedLocalVariableError(localRef: LocalRef<*>, codeScope: CodeScope<*, *>) : KlassFileError() {
+    init {
+        codeScope.printInfo()
+    }
+
+    override val message: String = "The local variable '${localRef.name}' in '${codeScope.scopeName}' is being accessed before it has been initialized. " +
+            "Please ensure that the local variable is initialized before accessing it."
 }
 
 class StackSizeMismatch(codeScope: CodeScope<*, *>, actual: Int, expected: Int) : KlassFileError() {

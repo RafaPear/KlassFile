@@ -12,6 +12,7 @@ open class LocalRef<T : Any>(
     val name: String,
     override val type: KlassDesc<T>,
     override val order: Int,
+    var isInitialized: Boolean = false
 ): OrderedRef<T> {
     override val owner: KlassDesc<Any>
         get() = error("No owner available")
