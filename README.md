@@ -1,6 +1,13 @@
 # KlassFile
 
-[![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=RafaPear_KlassFile)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
+[![Quality gate status](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=coverage)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
+
 > ⚠️ WORK IN PROGRESS ⚠️
 
 ## Status
