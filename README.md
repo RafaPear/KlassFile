@@ -67,7 +67,7 @@ interface Counter {
     fun increment()
 
     // Adds the given value to the counter.
-    fun addValue(value: Int)
+    fun addNumber(value: Int)
 
     // Resets the counter to zero.
     fun reset()
@@ -88,11 +88,11 @@ fun main() {
         access { public() }
 
         // Field name is defined by the property name.
-        val value by field<Int>()
+        val numberField by field<Int>()
 
         // Automatically generate a private getter and setter.
-        val getValue by getter(value) { private() }
-        val setValue by setter(value) { private() }
+        val getNumber by getter(numberField) { private() }
+        val setNumber by setter(numberField) { private() }
 
         constructor {
             access { public() }
@@ -104,25 +104,25 @@ fun main() {
                 // value = 0
                 loadReceiver() // Every MethodScope contains an implicit receiver
                 ldc(0)
-                setValue()
+                invokeMethod(setNumber)
 
                 ret()
             }
         }
 
         // Generates a method with parameters.
-        val addValue by method<Unit> {
+        val addNumber by method<Unit> {
 
             // Declare JVM method parameters.
-            val amount by parameter<Int>()
+            val amount by param<Int>()
 
             access { public() }
 
             code {
                 // value += amount
                 loadReceiver()
-                add(value, amount)
-                setValue()
+                add(numberField, amount)
+                invokeMethod(setNumber)
 
                 ret()
             }
@@ -137,7 +137,7 @@ fun main() {
                 ldc(1)
 
                 // Invoke another generated method through its MethodRef.
-                addValue()
+                invokeMethod(addNumber)
 
                 ret()
             }
@@ -150,7 +150,7 @@ fun main() {
             code {
                 loadReceiver()
                 ldc(0)
-                setValue()
+                invokeMethod(setNumber)
 
                 ret()
             }
@@ -162,7 +162,7 @@ fun main() {
 
             code {
                 loadReceiver()
-                getValue()
+                invokeMethod(getNumber)
 
                 ret()
             }
@@ -178,7 +178,7 @@ fun main() {
                 getStatic<System, PrintStream>("out")
 
                 loadReceiver()
-                getValue()
+                invokeMethod(getNumber)
 
                 // Resolve an existing JVM method using reflection.
                 val println by findMethod<PrintStream, Unit> {
@@ -186,7 +186,7 @@ fun main() {
                 }
 
                 // Invoke the resolved MethodRef.
-                println()
+                invokeMethod(println)
 
                 ret()
             }
@@ -196,7 +196,7 @@ fun main() {
 
     counter.increment()
     counter.increment()
-    counter.addValue(10)
+    counter.addNumber(10)
 
     println(counter.get()) // 12
 

@@ -12,7 +12,7 @@ class ArrayExample {
 
     @Test
     fun `Implement a sum interface that sums all numbers in a array`(){
-        val accumulator by klassFile<Accumulator> {
+        val accumulator = klassFile<Accumulator>("AccumulatorImpl") {
             access { public() }
 
             method<Int>("sum") {
@@ -48,10 +48,8 @@ class ArrayExample {
                     ret()
                 }
             }
-        }
-
-        val instance = accumulator.writeAndGetInstance()
+        }.writeAndGetInstance()
         val arr = intArrayOf(1, 2, 3, 4, 5)
-        assertEquals(15, instance.sum(arr))
+        assertEquals(15, accumulator.sum(arr))
     }
 }

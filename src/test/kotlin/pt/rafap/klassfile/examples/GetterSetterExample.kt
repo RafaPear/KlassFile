@@ -11,17 +11,15 @@ class GetterSetterExample {
 
     @Test
     fun `Implement a Person interface with getter and setter for age`() {
-        val person by klassFile<Person> {
+        val person = klassFile<Person>("PersonImpl") {
             access { public() }
 
             val age by field<Int> { private() }
 
             val setAge by setter(age)
             val getAge by getter(age)
-        }
-
-        val instance = person.writeAndGetInstance()
-        instance.setAge(30)
-        assert(instance.getAge() == 30)
+        }.writeAndGetInstance()
+        person.setAge(30)
+        assert(person.getAge() == 30)
     }
 }

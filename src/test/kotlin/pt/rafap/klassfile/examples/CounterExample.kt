@@ -12,7 +12,7 @@ class CounterExample {
 
     @Test
     fun `Implement an Adder function`() {
-        val counter by klassFile<Counter> {
+        val counter = klassFile<Counter>("CounterImpl") {
             access { public() }
 
             val start by method<Int> {
@@ -35,9 +35,8 @@ class CounterExample {
                     ret()
                 }
             }
-        }
+        }.writeAndGetInstance()
 
-        val instance = counter.writeAndGetInstance()
-        instance.start(5)
+        counter.start(5)
     }
 }

@@ -35,7 +35,7 @@ class CalculatorExample {
 
             code {
                 loadReceiver() // Loads receiver to load the field
-                getSum() // Get Sum Value
+                invokeMethod(getSum) // Get Sum Value
                 load(a) // Get Param Value
                 op() // calls the operator
                 store(a) // stores the sum back in a for ease
@@ -50,7 +50,7 @@ class CalculatorExample {
 
     @Test
     fun `Implement a Calculator interface that sums all numbers`() {
-        val calculator by klassFile<Calculator> {
+        val calculator = klassFile<Calculator>("CalculatorImpl") {
             access { public() }
 
             val sum by field<Int>()
@@ -81,15 +81,13 @@ class CalculatorExample {
             implementOperation("div", getSum, sum) {
                 div()
             }
-        }
-
-        val instance = calculator.writeAndGetInstance()
-        assertEquals(0, instance.getSum())
-        assertEquals(5, instance.add(5))
-        assertEquals(8, instance.add(3))
-        assertEquals(6, instance.sub(2))
-        assertEquals(12, instance.mul(2))
-        assertEquals(6, instance.div(2))
-        instance.printSum()
+        }.writeAndGetInstance()
+        assertEquals(0, calculator.getSum())
+        assertEquals(5, calculator.add(5))
+        assertEquals(8, calculator.add(3))
+        assertEquals(6, calculator.sub(2))
+        assertEquals(12, calculator.mul(2))
+        assertEquals(6, calculator.div(2))
+        calculator.printSum()
     }
 }

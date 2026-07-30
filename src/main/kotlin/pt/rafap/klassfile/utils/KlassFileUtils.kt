@@ -73,13 +73,13 @@ fun toModifiers(flags: Int): List<String> = buildList {
     if (Modifier.isNative(flags)) add("native")
 }
 
-//inline fun <reified T : Any> klassFile(
-//    name: String,
-//    noinline block: KlassFileBuilder<T>.() -> Unit,
-//) = KlassFileBuilder.klass<T>(name, block)
+inline fun <reified T : Any> klassFile(
+    name: String,
+    noinline block: KlassFileBuilder<T>.() -> Unit,
+) = KlassFileBuilder.klass<T>(name, block)
 
-inline fun <reified T: Any> klassFile(
-    noinline block: KlassFileBuilder<T>.() -> Unit
-): EagerDelegate<KlassFileBuilder<T>.Klass> =
-    EagerDelegate { _, property -> KlassFileBuilder.klass<T>(property.name, block) }
+//inline fun <reified T: Any> klassFile(
+//    noinline block: KlassFileBuilder<T>.() -> Unit
+//): EagerDelegate<KlassFileBuilder<T>.Klass> =
+//    EagerDelegate { _, property -> KlassFileBuilder.klass<T>(property.name, block) }
 

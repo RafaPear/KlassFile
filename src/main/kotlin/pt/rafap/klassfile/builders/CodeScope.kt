@@ -1115,11 +1115,6 @@ class CodeScope<O : Any, R : Any>(
         }
     }
 
-    /** Replays a method invocation using the reference's own dispatch kind. */
-    operator fun MethodRef<*, *>.invoke() {
-        invokeMethod(this)
-    }
-
     fun FieldRef<*, *>.load() {
         if (isStatic) getStatic(this)
         else {
@@ -1772,7 +1767,7 @@ class CodeScope<O : Any, R : Any>(
 
     private var counter = 0
     private fun generateForIdx(): LocalRef<Int> {
-        return local("for_$counter", klassDescOf<Int>())
+        return local("for_${++counter}", klassDescOf<Int>())
     }
 
     fun for_(range: CustomRange<*, *>): ForRef<O, R> {

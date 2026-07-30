@@ -12,7 +12,7 @@ class FibonacciExample {
 
     @Test
     fun `Implement a Fibonacci function`() {
-        val fibonacci by klassFile<Fibonacci> {
+        val fibonacci = klassFile<Fibonacci>("FibonacciImpl") {
             access { public() }
 
             method<Int>("fib") {
@@ -50,15 +50,14 @@ class FibonacciExample {
                 }
             }
 
-        }
+        }.writeAndGetInstance()
 
-        val instance = fibonacci.writeAndGetInstance()
-        assertEquals(instance.fib(0), 0)
-        assertEquals(instance.fib(1), 1)
-        assertEquals(instance.fib(2), 1)
-        assertEquals(instance.fib(3), 2)
-        assertEquals(instance.fib(4), 3)
-        assertEquals(instance.fib(5), 5)
-        assertEquals(instance.fib(6), 8)
+        assertEquals(fibonacci.fib(0), 0)
+        assertEquals(fibonacci.fib(1), 1)
+        assertEquals(fibonacci.fib(2), 1)
+        assertEquals(fibonacci.fib(3), 2)
+        assertEquals(fibonacci.fib(4), 3)
+        assertEquals(fibonacci.fib(5), 5)
+        assertEquals(fibonacci.fib(6), 8)
     }
 }
