@@ -2,7 +2,7 @@ plugins {
     // Apply the org.jetbrains.kotlin.jvm Plugin to add support for Kotlin.
     alias(libs.plugins.kotlin.jvm)
     jacoco
-    id("org.sonarqube") version "7.3.1.8318"
+    alias(libs.plugins.sonarqube)
 
     // Apply the ktlint plugin for code style checking.
     // id("org.jlleitschuh.gradle.ktlint")
