@@ -10,6 +10,14 @@ plugins {
     // id("org.jlleitschuh.gradle.ktlint")
 }
 
+sonar {
+    properties {
+        property("sonar.organization", "rafapear")
+        property("sonar.projectKey", "RafaPear_KlassFile")
+        property("sonar.host.url", "https://sonarcloud.io")
+    }
+}
+
 jacoco {
     toolVersion = "0.8.13"
 }
