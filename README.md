@@ -1,5 +1,6 @@
 # KlassFile
 
+[![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=RafaPear_KlassFile)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
 > ⚠️ WORK IN PROGRESS ⚠️
 
 ## Status

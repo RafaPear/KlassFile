@@ -3,9 +3,28 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     // Apply the org.jetbrains.kotlin.jvm Plugin to add support for Kotlin.
     alias(libs.plugins.kotlin.jvm)
+    jacoco
+    id("org.sonarqube") version "7.3.1.8318"
 
     // Apply the ktlint plugin for code style checking.
     // id("org.jlleitschuh.gradle.ktlint")
+}
+
+jacoco {
+    toolVersion = "0.8.13"
+}
+
+tasks.test {
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
 }
 
 repositories {
