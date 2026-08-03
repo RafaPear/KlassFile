@@ -18,22 +18,22 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7d590
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Setup Java
-        uses: actions/setup-java@99b8673ff64fbf33d8d8f9424cc60f1886c51f1d
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           distribution: temurin
           java-version: 24
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@600c74633a7c50c6f1a1c0ec64e18f0ead2db7c5
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
 
       - name: Generate Dokka
         run: ./gradlew dokkaGenerate
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@0f726310413de48512106d3046821e87224be7e6
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa
         with:
           path: build/dokka/html
 
@@ -53,4 +53,4 @@ jobs:
     steps:
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@d6db90164dcc165de6656944e1dbc0023595037e
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e
