@@ -11,6 +11,7 @@ plugins {
 
 val generateDokkaModule = tasks.register<Copy>("generateDokkaModule") {
     description = "Generates a Dokka module file for the project."
+    group = "documentation"
 
     from(layout.projectDirectory.file("README.md"))
     into(layout.buildDirectory.dir("dokka"))
