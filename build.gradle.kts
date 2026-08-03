@@ -9,6 +9,34 @@ plugins {
     // id("org.jlleitschuh.gradle.ktlint")
 }
 
+val generateDokkaModule = tasks.register<Copy>("generateDokkaModule") {
+    description = "Generates a Dokka module file for the project."
+
+    from(layout.projectDirectory.file("README.md"))
+    into(layout.buildDirectory.dir("dokka"))
+    rename { "module.md" }
+
+    filter { line ->
+        if (line.startsWith("# ")) "# Module KlassFile" else line
+    }
+}
+
+dokka {
+    dokkaSourceSets.configureEach {
+        includes.from(
+            generateDokkaModule.map {
+                layout.buildDirectory.file("dokka/module.md").get().asFile
+            }
+        )
+    }
+
+    pluginsConfiguration.html.footerMessage.set("Rafael Pereira")
+}
+
+tasks.matching { it.name.startsWith("dokka") }.configureEach {
+    dependsOn(generateDokkaModule)
+}
+
 sonar {
     properties {
         property("sonar.organization", "rafapear")
