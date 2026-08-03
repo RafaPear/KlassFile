@@ -1,8 +1,9 @@
 plugins {
     // Apply the org.jetbrains.kotlin.jvm Plugin to add support for Kotlin.
     alias(libs.plugins.kotlin.jvm)
-    jacoco
+    alias(libs.plugins.dokka)
     alias(libs.plugins.sonarqube)
+    jacoco
 
     // Apply the ktlint plugin for code style checking.
     // id("org.jlleitschuh.gradle.ktlint")
