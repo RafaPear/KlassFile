@@ -221,3 +221,22 @@ class NestedCodeScopes(methodScope: MethodScope<*, *>) : KlassFileError() {
         "A code block is being defined inside another code block in '${methodScope.name}'. " +
                 "Please define the inner code block outside of the outer one."
 }
+
+class MissingImplementationsError(
+    missing: List<MethodRef<*, *>>,
+    implementedMethods: List<MethodRef<*, *>>
+) : KlassFileError() {
+    override val message: String = buildString {
+        append("The following methods are missing implementations:\n")
+        for (method in missing) {
+            append("- ${method}\n")
+        }
+        append("\nImplemented methods:\n")
+        if (implementedMethods.isEmpty()) {
+            append("- None\n")
+        }
+        for (method in implementedMethods) {
+            append("- ${method}\n")
+        }
+    }
+}

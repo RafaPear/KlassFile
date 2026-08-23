@@ -14,6 +14,7 @@ import java.lang.classfile.Interfaces
 import java.lang.constant.ClassDesc
 import java.lang.constant.ConstantDescs.INIT_NAME
 import java.lang.reflect.Modifier
+import kotlin.jvm.java
 import kotlin.jvm.optionals.getOrNull
 import kotlin.reflect.KClass
 import kotlin.reflect.full.createInstance
@@ -69,22 +70,22 @@ class KlassFileBuilder<O : Any> private constructor(
      * @param access a lambda to configure the field's access flags using [FlagsScope.FieldFlagsScope]. Defaults to `private`.
      */
 
-    fun <T : Any> field(
+    fun <T : Any> defineField(
         name: String,
         type: KlassDesc<T>,
         access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
-    ): FieldRef<O, T> = fieldScope.field(name, type, access)
+    ): FieldRef<O, T> = fieldScope.defineField(name, type, access)
 
     /** Adds a delegated field using a reified Kotlin type. */
     inline fun <reified T : Any> field(
         noinline access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
     ) = EagerDelegate { _, property ->
-        field(property.name, klassDescOf<T>(), access)
+        defineField(property.name, klassDescOf<T>(), access)
     }
 
     /** Adds a method with an explicit name and type descriptor. */
 
-    fun <R : Any> method(
+    fun <R : Any> defineMethod(
         name: String,
         type: KlassDesc<R>,
         invokeType: InvokeType = InvokeType.VIRTUAL,
@@ -96,21 +97,20 @@ class KlassFileBuilder<O : Any> private constructor(
     }
 
     /** Adds a method with an explicit name and a reified return type. */
-    inline fun <reified R : Any> method(
+    inline fun <reified R : Any> defineMethod(
         name: String,
         invokeType: InvokeType = InvokeType.VIRTUAL,
         noinline builder: MethodScope<O, R>.() -> Unit,
-    ) = method(name, klassDescOf<R>(), invokeType, builder)
-
+    ) = defineMethod(name, klassDescOf<R>(), invokeType, builder)
+    
     /** Adds a delegated method whose name is inferred from the backing property. */
-
     fun <R : Any> method(
         type: KlassDesc<R>,
         invokeType: InvokeType = InvokeType.VIRTUAL,
         builder: MethodScope<O, R>.() -> Unit,
     ) = EagerDelegate { _, property ->
-        method(property.name, type, invokeType, builder)
-    }
+            defineMethod(property.name, type, invokeType, builder)
+        }
 
     /** Adds a delegated method using a reified return type. */
     inline fun <reified R : Any> method(
@@ -132,7 +132,7 @@ class KlassFileBuilder<O : Any> private constructor(
         builder: MethodScope<O, Unit>.() -> Unit = { access { public() }; code { defaultCtor(); ret() } },
     ): MethodRef<O, Unit> {
         hasNoArgsConstructor = true
-        return method(INIT_NAME, klassDescOf<Unit>(), InvokeType.SPECIAL, builder = builder)
+        return defineMethod(INIT_NAME, klassDescOf<Unit>(), InvokeType.SPECIAL, builder = builder)
     }
 
     /** Generates a conventional getter name for a field reference. */
@@ -156,11 +156,11 @@ class KlassFileBuilder<O : Any> private constructor(
 
     /** Creates a getter method that reads the provided field. */
 
-    fun <T : Any> getter(
+    fun <T : Any> defineGetter(
         name: String,
         field: FieldRef<O, T>,
         access: FlagsScope.MethodFlagsScope.() -> Unit = { public() },
-    ) = method(
+    ) = defineMethod(
         name,
         type = field.type,
         invokeType = getInvokeType(field),
@@ -179,16 +179,16 @@ class KlassFileBuilder<O : Any> private constructor(
         field: FieldRef<O, T>,
         noinline access: FlagsScope.MethodFlagsScope.() -> Unit = { public() },
     ) = EagerDelegate { _, _ ->
-        getter(field.genGetterName(), field, access)
+        defineGetter(field.genGetterName(), field, access)
     }
 
     /** Creates a setter method that writes the provided field. */
 
-    fun <T : Any> setter(
+    fun <T : Any> defineSetter(
         name: String,
         field: FieldRef<O, T>,
         access: FlagsScope.MethodFlagsScope.() -> Unit = { public() },
-    ) = method<Unit>(name, invokeType = getInvokeType(field)) {
+    ) = defineMethod<Unit>(name, invokeType = getInvokeType(field)) {
         val value by param(field.type)
 
         access { access() }
@@ -204,7 +204,7 @@ class KlassFileBuilder<O : Any> private constructor(
         field: FieldRef<O, T>,
         noinline access: FlagsScope.MethodFlagsScope.() -> Unit = { public() },
     ) = EagerDelegate { _, _ ->
-        setter(field.genSetterName(), field, access)
+        defineSetter(field.genSetterName(), field, access)
     }
 
     /////// BUILDERS AND LOADERS ///////
@@ -301,16 +301,7 @@ class KlassFileBuilder<O : Any> private constructor(
 
         // 4. Erro se faltar algo
         if (missing.isNotEmpty()) {
-            error(buildString {
-                appendLine("Missing implementations:")
-                missing.forEach {
-                    appendLine(" - ${it.name} ${it.methodTypeDesc}")
-                }
-                appendLine("Current:")
-                implementedMethods.forEach {
-                    appendLine(" - ${it.name} ${it.methodTypeDesc}")
-                }
-            })
+            throw MissingImplementationsError(missing, implementedMethods.toList())
         }
     }
 

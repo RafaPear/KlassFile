@@ -28,7 +28,7 @@ class CalculatorExample {
         sum: FieldRef<Calculator, Int>,
         op: CodeScope<*, *>.() -> Unit
     ) {
-        method<Int>(name) {
+        defineMethod<Int>(name) {
             access { public() }
 
             val a by param<Int>()

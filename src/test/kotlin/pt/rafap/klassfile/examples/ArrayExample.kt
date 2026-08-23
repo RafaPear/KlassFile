@@ -15,7 +15,7 @@ class ArrayExample {
         val accumulator = klassFile<Accumulator>("AccumulatorImpl") {
             access { public() }
 
-            method<Int>("sum") {
+            defineMethod<Int>("sum") {
                 access { public() }
 
                 val arr by param<IntArray>()

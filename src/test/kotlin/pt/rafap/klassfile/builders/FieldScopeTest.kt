@@ -13,7 +13,7 @@ class FieldScopeTest {
     fun `field creates reference`() {
         val scope = FieldScope(owner)
 
-        val field = scope.field<Int>("count")
+        val field = scope.defineField<Int>("count")
 
         assertEquals("count", field.name)
         assertEquals(owner, field.owner)
@@ -24,7 +24,7 @@ class FieldScopeTest {
     fun `field is private by default`() {
         val scope = FieldScope(owner)
 
-        val field = scope.field<Int>("count")
+        val field = scope.defineField<Int>("count")
 
         assertEquals(ACC_PRIVATE, field.flags)
     }
@@ -33,7 +33,7 @@ class FieldScopeTest {
     fun `field supports custom flags`() {
         val scope = FieldScope(owner)
 
-        val field = scope.field<Int>("count") {
+        val field = scope.defineField<Int>("count") {
             public()
             static()
             final()

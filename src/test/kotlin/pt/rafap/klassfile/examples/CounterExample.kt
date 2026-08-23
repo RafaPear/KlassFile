@@ -15,7 +15,7 @@ class CounterExample {
         val counter = klassFile<Counter>("CounterImpl") {
             access { public() }
 
-            val start by method<Int> {
+            defineMethod<Int>("start") {
                 access { public() }
 
                 val n by param<Int>()

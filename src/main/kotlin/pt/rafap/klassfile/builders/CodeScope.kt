@@ -52,11 +52,11 @@ class CodeScope<O : Any, R : Any>(
         isInsideRawBlock = false
     }
 
-    fun <T : Any> local(name: String, type: KlassDesc<T>) = locals.addLocal(name, type)
+    fun <T : Any> defineLocal(name: String, type: KlassDesc<T>) = locals.addLocal(name, type)
 
     inline fun <reified T : Any> local(): EagerDelegate<LocalRef<T>> =
         EagerDelegate { _, prop ->
-            local(prop.name, klassDescOf<T>())
+            defineLocal(prop.name, klassDescOf<T>())
         }
 
     inline infix fun <reified T : Any> LocalRef<T>.set(value: T) {
@@ -736,13 +736,13 @@ class CodeScope<O : Any, R : Any>(
         raw { goto_(label.getLabel()) }
     }
 
-    fun label(name: String): LabelRef {
+    fun defineLabel(name: String): LabelRef {
         val ref = LabelRef(name)
         raw { ref.setLabel(newLabel()) }
         return ref
     }
 
-    fun label(): EagerDelegate<LabelRef> = EagerDelegate { _, param -> label(param.name) }
+    fun label(): EagerDelegate<LabelRef> = EagerDelegate { _, param -> defineLabel(param.name) }
 
     fun LabelRef.bind() {
         if (isBound()) instructions.removeAt(boundIdx)
@@ -974,12 +974,9 @@ class CodeScope<O : Any, R : Any>(
 
     /** Lazily resolves a method reference using the current property name when omitted. */
     inline fun <reified O : Any, reified R : Any> findMethod(
-        name: String? = null,
+        name: String,
         noinline builder: ArgumentScope.() -> Unit,
-    ) = EagerDelegate { _, property ->
-        findMethod(name ?: property.name, klassDescOf<O>(), klassDescOf<R>(), builder)
-    }
-
+    ) = findMethod(name, klassDescOf<O>(), klassDescOf<R>(), builder)
 
     /**
      * Ensures a method reference matches the expected invocation kind.
@@ -1105,7 +1102,7 @@ class CodeScope<O : Any, R : Any>(
         noinline builder: ArgumentScope.() -> Unit = {},
     ) {
 
-        val methodRef by findMethod<O, R>(name, builder)
+        val methodRef = findMethod<O, R>(name, builder)
 
         when (methodRef.invokeType) {
             InvokeType.STATIC -> invokeStatic(methodRef)
@@ -1767,7 +1764,7 @@ class CodeScope<O : Any, R : Any>(
 
     private var counter = 0
     private fun generateForIdx(): LocalRef<Int> {
-        return local("for_${++counter}", klassDescOf<Int>())
+        return defineLocal("for_${++counter}", klassDescOf<Int>())
     }
 
     fun for_(range: CustomRange<*, *>): ForRef<O, R> {
@@ -1940,70 +1937,6 @@ class CodeScope<O : Any, R : Any>(
         stack.push(v3)
         stack.push(v2)
         stack.push(v1)
-    }
-
-    /** Emits `dup2_x2`. */
-    fun dup2X2() {
-        val v1 = stack.pop()
-
-        when (v1.category) {
-            2 -> {
-                val v2 = stack.pop()
-
-                if (v2.category == 2) {
-                    raw { dup2_x2() }
-
-                    stack.push(v1)
-                    stack.push(v2)
-                    stack.push(v1)
-                } else {
-                    val v3 = stack.pop()
-
-                    if (v3.category != 1)
-                        error("Invalid stack shape for dup2_x2.")
-
-                    raw { dup2_x2() }
-
-                    stack.push(v1)
-                    stack.push(v3)
-                    stack.push(v2)
-                    stack.push(v1)
-                }
-            }
-
-            1 -> {
-                val v2 = stack.pop()
-
-                if (v2.category != 1)
-                    error("Invalid stack shape for dup2_x2.")
-
-                val v3 = stack.pop()
-
-                if (v3.category == 2) {
-                    raw { dup2_x2() }
-
-                    stack.push(v2)
-                    stack.push(v1)
-                    stack.push(v3)
-                    stack.push(v2)
-                    stack.push(v1)
-                } else {
-                    val v4 = stack.pop()
-
-                    if (v3.category != 1 || v4.category != 1)
-                        error("Invalid stack shape for dup2_x2.")
-
-                    raw { dup2_x2() }
-
-                    stack.push(v2)
-                    stack.push(v1)
-                    stack.push(v4)
-                    stack.push(v3)
-                    stack.push(v2)
-                    stack.push(v1)
-                }
-            }
-        }
     }
 
     /** Emits `swap`. */

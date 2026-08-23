@@ -15,7 +15,7 @@ class FibonacciExample {
         val fibonacci = klassFile<Fibonacci>("FibonacciImpl") {
             access { public() }
 
-            method<Int>("fib") {
+            defineMethod<Int>("fib") {
                 access { public() }
 
                 val n by param<Int>()

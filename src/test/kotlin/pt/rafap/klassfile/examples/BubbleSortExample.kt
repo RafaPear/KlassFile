@@ -72,7 +72,7 @@ class BubbleSortExample {
         val intSorter = klassFile<IntSorter>("IntSorterImpl") {
             access { public() }
 
-            method<IntArray>("sort") {
+            defineMethod<IntArray>("sort") {
                 access { public() }
 
                 val arr by param<IntArray>()

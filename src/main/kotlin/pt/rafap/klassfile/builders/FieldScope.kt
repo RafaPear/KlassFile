@@ -30,7 +30,7 @@ class FieldScope<O : Any>(val owner: KlassDesc<O>) {
     }
 
     /** Adds a field with an explicit name and type. */
-    fun <T : Any> field(
+    fun <T : Any> defineField(
         name: String,
         type: KlassDesc<T> = klassDescOf<Unit>() as KlassDesc<T>,
         access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
@@ -41,11 +41,11 @@ class FieldScope<O : Any>(val owner: KlassDesc<O>) {
     }
 
     /** Adds a field with an explicit name and type. */
-    inline fun <reified T : Any> field(
+    inline fun <reified T : Any> defineField(
         name: String,
         noinline access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
     ): FieldRef<O, T> {
-        return field(name, klassDescOf(), access)
+        return defineField(name, klassDescOf(), access)
     }
 
     /** Adds a delegated field whose name is inferred from the backing property. */
@@ -53,7 +53,7 @@ class FieldScope<O : Any>(val owner: KlassDesc<O>) {
         noinline access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
     ): EagerDelegate<FieldRef<O, T>> = EagerDelegate<FieldRef<O, T>> { _, property ->
         val name = property.name
-        field(name, klassDescOf(), access)
+        defineField(name, klassDescOf(), access)
     }
 
     /** Emits all collected fields into the provided class builder. */

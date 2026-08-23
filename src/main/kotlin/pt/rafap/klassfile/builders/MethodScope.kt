@@ -62,19 +62,19 @@ class MethodScope<O : Any, R : Any>(
     fun receiver(): EagerDelegate<ParamRef.ReceiverRef<O>> = EagerDelegate { _, _ -> receiver }
 
     /** Adds a parameter with an explicit type descriptor. */
-    fun <R : Any> param(name: String, type: KlassDesc<R>): ParamRef<R> = generateParam(name, type)
+    fun <R : Any> defineParam(name: String, type: KlassDesc<R>): ParamRef<R> = generateParam(name, type)
 
     /** Adds a parameter using a reified Kotlin type. */
-    inline fun <reified R : Any> param(name: String): ParamRef<R> = param(name, klassDescOf<R>())
+    inline fun <reified R : Any> defineParam(name: String): ParamRef<R> = defineParam(name, klassDescOf<R>())
 
     /** Adds a lazily named parameter based on the backing property name. */
     inline fun <reified R : Any> param(): EagerDelegate<ParamRef<R>> = EagerDelegate { _, property ->
-        param(property.name)
+        defineParam(property.name)
     }
 
     /** Adds a lazily named parameter with an explicit type. */
     fun <R : Any> param(type: KlassDesc<R>): EagerDelegate<ParamRef<R>> = EagerDelegate { _, property ->
-        param(property.name, type)
+        defineParam(property.name, type)
     }
 
     private var isInCode = false
