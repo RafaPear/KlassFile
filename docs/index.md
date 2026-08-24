@@ -4,9 +4,21 @@ KlassFile is a Kotlin DSL for **generating** JVM class files with Java's `java.l
 
 It provides Kotlin-friendly builders for classes, fields, methods, parameters, local variables, control flow, and common bytecode instructions. Reified type parameters and `KlassDesc` values let most code use Kotlin types instead of handwritten JVM descriptors.
 
+The API has two levels. Low-level `CodeScope` functions are thin Kotlin wrappers around individual Java ClassFile `CodeBuilder` instructions, adding typed references and operand-stack tracking. Higher-level helpers such as `if_`, `while_`, `for_`, getters, setters, and `instantiate` compose those lower-level instructions into common bytecode patterns.
+
 While emitting code, KlassFile tracks a subset of operand-stack and local-variable invariants. This can report many mistakes at the DSL call site, before a generated class reaches the JVM verifier.
 
 > **Status:** Work in progress. KlassFile generates new classes; it does not parse or transform existing `.class` files. Exception handling and `invokedynamic` are not implemented.
+
+## Why KlassFile?
+
+Generating JVM bytecode directly is powerful, but it is also low-level: callers must manage descriptors, local-variable slots, operand-stack order, labels, branches, and invocation opcodes.
+
+KlassFile keeps that control while providing a Kotlin-first DSL. It represents fields, methods, parameters, locals, and labels as typed references; tracks a subset of JVM stack invariants; and builds common control-flow patterns from ordinary Kotlin expressions.
+
+Use KlassFile when you need to generate a new JVM class at runtime—for example, to implement an interface or abstract class dynamically—without manually assembling every class-file instruction.
+
+KlassFile is not a Kotlin compiler, and it does not parse or transform existing `.class` files.
 
 ## Requirements
 
@@ -16,9 +28,11 @@ While emitting code, KlassFile tracks a subset of operand-stack and local-variab
 ## Documentation
 
 - [Getting started](getting-started.md)
+- [Builders and scopes](builders-and-scopes.md)
 - [Classes, fields, and methods](classes-and-members.md)
 - [Types and member references](types-and-references.md)
 - [References and operand stack](references-and-stack.md)
+- [Complete DSL reference](dsl-reference.md)
 - [Bytecode instructions](bytecode.md)
 - [Control flow and arrays](control-flow-and-arrays.md)
 - [Validation and errors](validation.md)

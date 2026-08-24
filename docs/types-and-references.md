@@ -1,86 +1,96 @@
-# Types and member references
+# Types and references
 
-## Reified Kotlin types
+KlassFile separates **type descriptions** from **references**. A type description says what a JVM value is; a reference says where a value lives, which member can be called, or where a branch goes.
 
-Most declaration APIs accept a reified type parameter:
+## Type descriptions
+
+`KlassDesc<T>` combines a Java `ClassDesc` (class-file emission) with a Kotlin `KClass<T>` (reflection and validation). Normal DSL code uses reified types:
 
 ```kotlin
 field<Int>()
 defineMethod<String>("message") { /* ... */ }
 param<IntArray>()
 local<Long>()
-```
-
-KlassFile converts these types to its `KlassDesc<T>` representation and then to Java's `ClassDesc`. This avoids manually typing descriptors such as `I` or `Ljava/lang/String;` for these common cases.
-
-## `KlassDesc`
-
-Use `klassDescOf<T>()` when an API needs an explicit type value:
-
-```kotlin
-import pt.rafap.klassfile.utils.klassDescOf
 
 val stringType = klassDescOf<String>()
-val namesType = klassDescOf<String>().array()
+val stringArrayType = stringType.array()
 ```
 
-`KlassDesc` couples a JVM `ClassDesc` and a Kotlin `KClass`. It is also available through constructors that accept a `KClass`, `Class`, or `KType`.
-
-## Arrays and type limits
-
-Primitive arrays, such as `IntArray`, are supported. Object arrays can be represented with `Array<String>`. `Array<Int>` and similar arrays of Kotlin primitive types are rejected deliberately because their JVM representation (`Integer[]`) differs from a primitive array (`int[]`).
-
-The reified DSL APIs use `T : Any`; nullable types are therefore not accepted by those APIs. Kotlin generic type arguments are erased on the JVM, so `List<String>` and `List<Int>` have the same runtime class descriptor.
-
-## References
-
-The DSL returns references that describe declared members and values:
-
-- `FieldRef` for fields.
-- `MethodRef` for methods and constructors.
-- `ParamRef` for parameters.
-- `LocalRef` for local variables.
-
-Keep these values and use them in code generation. This preserves the owner and type information needed by instructions:
+Use an explicit `KlassDesc` when it must be passed as a value:
 
 ```kotlin
-val value by field<Int>()
-val getValue by getter(value)
+defineField("value", klassDescOf<Int>())
+new(klassDescOf<StringBuilder>())
+checkCast(klassDescOf<CharSequence>())
+```
 
-defineMethod<Int>("read") {
+The reified DSL APIs require `T : Any`; nullable types need an explicit `KType`-based descriptor. Generic arguments are erased by the JVM, so `List<String>` and `List<Int>` share one runtime descriptor. Primitive arrays such as `IntArray` and object arrays such as `Array<String>` are supported; `Array<Int>` is rejected because it means `Integer[]`, not `int[]`.
+
+## Reference model
+
+There is no single “reference” accepted everywhere. This table is the practical guide:
+
+| Reference | Describes | Created by | Use it with | Do not use it with |
+|---|---|---|---|---|
+| `ParamRef<T>` | A method parameter in a local slot | `val x by param<T>()`, `defineParam` | `load`, `store`, `inc`, comparisons, ranges, array indexing, arithmetic helpers | Declaration after `code {}` |
+| `LocalRef<T>` | A local variable in a local slot | `val x by local<T>()`, `defineLocal` | `load`, `store`, `inc`, comparisons, ranges, array indexing, arithmetic helpers | `load` before initialization |
+| `ParamRef.ReceiverRef<T>` | The implicit `this` parameter | `receiver()` / `loadReceiver()` | Field and instance-call setup | Static-only logic |
+| `FieldRef<O, T>` | A generated instance/static field | `field<T>()`, `defineField` | `field.load()`, `field.store {}`, `getField`, `putField`, arithmetic helpers | `load(field)`, ranges, or array-indexing sugar |
+| `MethodRef<O, R>` | A method or constructor signature | `method`, `defineMethod`, `constructor`, `findMethod` | `invokeMethod`, `invokeVirtual`, `invokeInterface`, `invokeStatic`, `invokeSpecial` | `load` or arithmetic helpers |
+| `LabelRef` | A branch destination | `val target by label()`, `defineLabel` | `goto`, `if*`, `if_`, loop builders | Any value-producing operation |
+
+## `TypedRef` versus `OrderedRef`
+
+These are API abstractions, not additional runtime entities:
+
+```text
+ParamRef ─┐
+          ├─ OrderedRef ─ TypedRef
+LocalRef ─┘
+
+FieldRef ──────────────── TypedRef
+MethodRef ─────────────── TypedRef
+LabelRef ──────────────── neither
+```
+
+| Abstraction | Meaning | Implemented by | Practical consequence |
+|---|---|---|---|
+| `TypedRef<O, T>` | Has a known `KlassDesc<T>` type | Fields, methods, parameters, locals | Arithmetic helper overloads can accept a parameter, local, or field. A typed reference is not necessarily loadable. |
+| `OrderedRef<T>` | Has a JVM local-variable `order` | Parameters and locals only | `load`, `store`, comparisons, ranges, and array sugar work with it. |
+
+`OrderedRef` technically inherits `TypedRef<Any, T>`, but `ParamRef` and `LocalRef` do not have a meaningful member owner; accessing their `owner` property is invalid. The rule to remember is: **local-slot values use `OrderedRef`; fields use `FieldRef`; calls use `MethodRef`; branches use `LabelRef`.**
+
+## Examples
+
+```kotlin
+val count by field<Int>()
+
+defineMethod<Int>("next") {
+    val amount by param<Int>()
     access { public() }
+
     code {
-        loadReceiver()
-        invokeMethod(getValue)
+        val result by local<Int>()
+
+        count.load()     // FieldRef helper
+        load(amount)     // ParamRef
+        add()
+        store(result)    // LocalRef
+
+        load(result)
         ret()
     }
 }
 ```
 
-### Which references can an instruction accept?
+## Existing methods
 
-The distinction matters because the DSL does not accept every reference type everywhere.
-
-| Reference type    | Created by                             | Represents                          | Accepted directly by                                                           |
-|-------------------|----------------------------------------|-------------------------------------|--------------------------------------------------------------------------------|
-| `ParamRef<T>`     | `val value by param<T>()`              | A method parameter                  | `load`, `store`, `inc`, `dec`, comparisons, array indexing, arithmetic helpers |
-| `LocalRef<T>`     | `val total by local<T>()`              | A local variable slot               | `load`, `store`, `inc`, `dec`, comparisons, array indexing, arithmetic helpers |
-| `FieldRef<O, T>`  | `field`, `defineField`                 | A declared instance or static field | field helpers; also arithmetic helpers through `TypedRef`                      |
-| `MethodRef<O, R>` | `method`, `defineMethod`, `findMethod` | A callable method or constructor    | `invokeMethod` and explicit invocation helpers                                 |
-| `LabelRef`        | `val end by label()`                   | A branch target                     | `goto`, low-level conditional instructions, `if_`                              |
-
-`ParamRef` and `LocalRef` implement `OrderedRef`; `FieldRef` does not. Therefore `load(field)` is not valid. Use `field.load()`, or explicitly load the receiver and call `getField(field)`. Likewise, range, comparison, and array-indexing sugar is defined for `OrderedRef` values, not fields.
-
-The arithmetic convenience overloads (`add`, `sub`, `mul`, `div`, `rem`, `neg`, shifts, and bitwise operations) accept `TypedRef`, so they can load a parameter, local, or field. When passed a field, they load the current receiver and read that field.
-
-## Resolving existing methods
-
-`findMethod` resolves a public Java/Kotlin method through reflection. Give the owner, return type, and parameter types to disambiguate overloads:
+`findMethod` resolves a public Java/Kotlin method or constructor by reflection. Its block declares parameter **types** only, to resolve overloads:
 
 ```kotlin
-val println by findMethod<java.io.PrintStream, Unit>("println") {
+val println = findMethod<java.io.PrintStream, Unit>("println") {
     arg<Int>()
 }
 ```
 
-The returned `MethodRef` can be passed to `invokeMethod`. Resolution considers public members; an ambiguous overload causes an error with the remaining candidates.
+It finds public candidates and filters by the supplied parameter types. Calling the `MethodRef` still requires the receiver and arguments to be pushed in bytecode order; see [References and operand stack](references-and-stack.md#calls-and-constructors).

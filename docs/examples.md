@@ -14,8 +14,8 @@ val person = klassFile<Person>("PersonImpl") {
     access { public() }
 
     val age by field<Int> { private() }
-    setter(age)
-    getter(age)
+    val getAge by getter(age)
+    val setAge by setter(age)
 }.writeAndGetInstance()
 
 person.setAge(30)
@@ -64,7 +64,7 @@ val accumulator = klassFile<Accumulator>("AccumulatorImpl") {
 check(accumulator.sum(intArrayOf(1, 2, 3)) == 6)
 ```
 
-For more complete examples, see the source tests:
+For more complete examples, see the source tests in `src/test/kotlin/pt/rafap/klassfile/examples/`:
 
 - `ArrayExample.kt` — summing an `IntArray`.
 - `CalculatorExample.kt` — implementation of an abstract class with fields and operations.

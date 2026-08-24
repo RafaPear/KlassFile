@@ -2,6 +2,23 @@
 
 All bytecode is emitted inside a method's `code` block. KlassFile tracks the simulated operand stack while these helpers run.
 
+## Two API levels
+
+The low-level instruction APIs map closely to JVM operations. They are not an interpreter and do not hide the emitted bytecode: each helper records the corresponding Java `CodeBuilder` operation and updates KlassFile's stack model. Examples include `ldc`, `load`, `store`, `getField`, `putField`, `invokeVirtual`, `goto`, `ifICmpLt`, `arrayLoad`, `iinc`-style `inc`, and stack operations such as `dup`.
+
+The higher-level DSL is built from those same primitives:
+
+| Higher-level helper | Composes low-level operations such as |
+|---|---|
+| `if_(condition) { body }` | labels, `goto`, label binding, and a conditional branch |
+| `while_(condition) do_ { body }` | labels, conditional branch, `goto` |
+| `for_(range) do_ { body }` | local initialization, comparisons, labels, `inc`, `goto` |
+| `getter(field)` / `setter(field)` | receiver load, field access, parameter load, `ret` |
+| `instantiate<T>()` | `new`, `dup`, constructor resolution, `invokespecial` |
+| `putThisField(field) { ... }` | `loadReceiver`, value generation, `putfield` |
+
+Choose the high-level form for the common case. Use low-level operations when you need an exact bytecode shape, a custom branch layout, or explicit stack manipulation.
+
 ## Values, locals, and return
 
 ```kotlin
@@ -68,6 +85,21 @@ count.store { ldc(2) }
 ```
 
 Lower-level alternatives are `getField`, `putField`, `getStatic`, and `putStatic`. Instance field instructions require an object reference on the stack; KlassFile's convenience helpers load the current receiver when appropriate.
+
+## Low-level branches and labels
+
+KlassFile exposes the complete conditional-branch families used by the JVM `if*` instructions:
+
+| JVM family | KlassFile functions | Stack operands |
+|---|---|---|
+| zero comparison | `ifEq`, `ifNe`, `ifLt`, `ifLe`, `ifGt`, `ifGe` | one `int`-category value |
+| integer comparison | `ifICmpEq`, `ifICmpNe`, `ifICmpLt`, `ifICmpLe`, `ifICmpGt`, `ifICmpGe` | two `int`-category values |
+| reference comparison | `ifACmpEq`, `ifACmpNe` | two references |
+| null comparison | `ifNull`, `ifNonNull` | one reference |
+
+Every branch receives a `LabelRef`. Create one with `val target by label()`, emit `goto(target)` or an `if*` instruction, then emit `target.bind()` at its destination. The [control-flow chapter](control-flow-and-arrays.md#low-level-branches) shows the exact stack requirements and the comparison sugar built on top of these functions.
+
+Other low-level instruction families currently exposed include local loads/stores, numeric and bitwise arithmetic, casts, `instanceof`, object creation, array creation/access, field access, every invocation kind (`virtual`, `interface`, `static`, and `special`), and the JVM stack-rearrangement instructions. Each API is documented with its required stack shape in [References and operand stack](references-and-stack.md).
 
 ## Calls and objects
 
