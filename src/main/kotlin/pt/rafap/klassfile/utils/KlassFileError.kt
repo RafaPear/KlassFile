@@ -82,19 +82,19 @@ class NoParamFoundError(paramName: String) : KlassFileError() {
 
 /** Thrown when a parameter is declared after code emission has already started. */
 class ParamDefinitionInCodeError(paramName: String) : KlassFileError() {
-    override val message: String = "The parameter '$paramName' is being defined inside a code block." +
+    override val message: String = "The parameter '$paramName' is being defined inside a code block. " +
             "Please define the parameter outside and before the code block."
 }
 
 /** Thrown when a local slot index does not map to a known parameter. */
 class InvalidSlotIndexError(index: Int) : KlassFileError() {
-    override val message: String = "The requested slot index '$index' does not exist." +
+    override val message: String = "The requested slot index '$index' does not exist. " +
             "Create the parameter for that slot before trying to access it."
 }
 
 /** Thrown when a nested raw bytecode block is attempted. */
 class NestedRawBlockError : KlassFileError() {
-    override val message: String = "A raw code block is being defined inside another raw code block." +
+    override val message: String = "A raw code block is being defined inside another raw code block. " +
             "Please define the inner raw code block outside of the outer one."
 }
 
@@ -220,4 +220,23 @@ class NestedCodeScopes(methodScope: MethodScope<*, *>) : KlassFileError() {
     override val message: String =
         "A code block is being defined inside another code block in '${methodScope.name}'. " +
                 "Please define the inner code block outside of the outer one."
+}
+
+class MissingImplementationsError(
+    missing: List<MethodRef<*, *>>,
+    implementedMethods: List<MethodRef<*, *>>
+) : KlassFileError() {
+    override val message: String = buildString {
+        append("The following methods are missing implementations:\n")
+        for (method in missing) {
+            append("- ${method}\n")
+        }
+        append("\nImplemented methods:\n")
+        if (implementedMethods.isEmpty()) {
+            append("- None\n")
+        }
+        for (method in implementedMethods) {
+            append("- ${method}\n")
+        }
+    }
 }

@@ -31,7 +31,7 @@
 | Control Flow (`if`, `goto`, loops, labels)   | ✅ Complete                                         |
 | Exception Handling (`try` / `catch`)         | ❌ Not implemented                                  |
 | Local Variables API                          | ✅ Complete                                         |
-| Invokedynamic / Lambdas                      | ❌ Not Planed                                       |
+| Invokedynamic / Lambdas                      | ❌ Not Planned                                      |
 
 ## Test Suite Status
 
@@ -136,7 +136,7 @@ fun main() {
             }
         }
 
-        method<Unit>("increment") {
+        defineMethod<Unit>("increment") {
 
             access { public() }
 
@@ -151,7 +151,7 @@ fun main() {
             }
         }
 
-        method<Unit>("reset") {
+        defineMethod<Unit>("reset") {
 
             access { public() }
 
@@ -164,7 +164,7 @@ fun main() {
             }
         }
 
-        method<Int>("get") {
+        defineMethod<Int>("get") {
 
             access { public() }
 
@@ -176,7 +176,7 @@ fun main() {
             }
         }
 
-        method<Unit>("print") {
+        defineMethod<Unit>("print") {
 
             access { public() }
 
@@ -189,8 +189,8 @@ fun main() {
                 invokeMethod(getNumber)
 
                 // Resolve an existing JVM method using reflection.
-                val println by findMethod<PrintStream, Unit> {
-                    param<Int>()
+                val println = findMethod<PrintStream, Unit>("println") {
+                    arg<Int>()
                 }
 
                 // Invoke the resolved MethodRef.

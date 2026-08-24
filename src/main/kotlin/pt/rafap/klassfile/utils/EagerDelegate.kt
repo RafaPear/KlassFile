@@ -15,6 +15,7 @@ class EagerDelegate<out R : Any>(
 
 	private var ref: R? = null
 
+
 	/** Returns the cached value or computes it on first access. */
 	override fun getValue(thisRef: Any?, property: KProperty<*>): R {
 		val copy = ref
