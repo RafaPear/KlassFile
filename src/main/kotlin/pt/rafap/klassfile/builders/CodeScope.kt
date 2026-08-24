@@ -22,9 +22,9 @@ import kotlin.reflect.KClass
 class CodeScope<O : Any, R : Any>(
     val scopeName: String,
     override val type: KlassDesc<R>,
-    override val owner: KlassDesc<O>,
+    override val ownerRef: OwnerRef<O>,
     val params: List<ParamRef<*>>,
-) : TypedRef<O, R> {
+) : OwnedRef<O, R> {
 
     private val locals = LocalsStorage(params)
     private var instructions = mutableListOf<CodeBuilder.() -> Unit>()
@@ -90,14 +90,18 @@ class CodeScope<O : Any, R : Any>(
      */
     fun defaultCtor() {
         loadReceiver()
-        val ownerKClass = owner.kClass
-        if (!ownerKClass.isFinal && !ownerKClass.java.isInterface) {
-            val ref = findMethod<O, Unit>(ConstantDescs.INIT_NAME, owner, klassDescOf()) {}
-            invokeSpecial(ref)
-        } else if (ownerKClass.java.isInterface) {
-            val ref = findMethod(ConstantDescs.INIT_NAME, klassDescOf<Any>(), klassDescOf<Unit>()) {}
-            invokeSpecial(ref)
-        } else throw NoConstructorError(ownerKClass.simpleName ?: "Unknown")
+
+        val ref = if (ownerRef.inheritor.kClass.java.isInterface) {
+            findMethod<Any, Unit>(ConstantDescs.INIT_NAME) {}
+        } else {
+            findMethod<O, Unit>(
+                ConstantDescs.INIT_NAME,
+                ownerRef.inheritor,
+                klassDescOf()
+            ) {}
+        }
+
+        invokeSpecial(ref)
     }
 
     /** Emits the appropriate return instruction for the declared return type. */
@@ -979,6 +983,31 @@ class CodeScope<O : Any, R : Any>(
     ) = findMethod(name, klassDescOf<O>(), klassDescOf<R>(), builder)
 
     /**
+     * Resolves a method reference using an explicit owner and return type.
+     *
+     * @param name the method name to resolve.
+     * @param owner the class that owns the method.
+     * @param returnType the expected return type.
+     * @param builder additional parameter metadata used for overload resolution.
+     * @return the resolved method reference.
+     */
+    fun <O : Any, R : Any> findMethodOrNull(
+        name: String,
+        owner: KlassDesc<O>,
+        returnType: KlassDesc<R>,
+        builder: ArgumentScope.() -> Unit,
+    ): MethodRef<O, R>? {
+        val params = ArgumentScope().apply(builder).build().toTypedArray()
+        return resolveMethodOrNull(name, owner, returnType, *params)
+    }
+
+    /** Lazily resolves a method reference using the current property name when omitted. */
+    inline fun <reified O : Any, reified R : Any> findMethodOrNull(
+        name: String,
+        noinline builder: ArgumentScope.() -> Unit,
+    ) = findMethodOrNull(name, klassDescOf<O>(), klassDescOf<R>(), builder)
+
+    /**
      * Ensures a method reference matches the expected invocation kind.
      *
      * @param expected the required invocation type.
@@ -1078,11 +1107,6 @@ class CodeScope<O : Any, R : Any>(
      * @param methodRef the method reference to invoke.
      */
     fun invokeMethod(methodRef: MethodRef<*, *>) {
-        if (methodRef.owner == owner && owner.kClass.java.isInterface) {
-            invokeInterface(methodRef.copy(invokeType = InvokeType.INTERFACE))
-            return
-        }
-
         when (methodRef.invokeType) {
             InvokeType.STATIC -> invokeStatic(methodRef)
             InvokeType.SPECIAL -> invokeSpecial(methodRef)

@@ -1,5 +1,6 @@
 package pt.rafap.klassfile.builders
 
+import pt.rafap.klassfile.models.OwnerRef
 import pt.rafap.klassfile.utils.klassDescOf
 import java.lang.classfile.ClassFile.*
 import kotlin.test.Test
@@ -7,22 +8,22 @@ import kotlin.test.assertEquals
 
 class FieldScopeTest {
 
-    private val owner = klassDescOf<String>()
+    private val ownerRef = OwnerRef(klassDescOf<String>(), klassDescOf<String>())
 
     @Test
     fun `field creates reference`() {
-        val scope = FieldScope(owner)
+        val scope = FieldScope(ownerRef)
 
         val field = scope.defineField<Int>("count")
 
         assertEquals("count", field.name)
-        assertEquals(owner, field.owner)
+        assertEquals(ownerRef.thisClass, field.owner)
         assertEquals(klassDescOf<Int>(), field.type)
     }
 
     @Test
     fun `field is private by default`() {
-        val scope = FieldScope(owner)
+        val scope = FieldScope(ownerRef)
 
         val field = scope.defineField<Int>("count")
 
@@ -31,7 +32,7 @@ class FieldScopeTest {
 
     @Test
     fun `field supports custom flags`() {
-        val scope = FieldScope(owner)
+        val scope = FieldScope(ownerRef)
 
         val field = scope.defineField<Int>("count") {
             public()
@@ -47,12 +48,12 @@ class FieldScopeTest {
 
     @Test
     fun `delegated field uses property name`() {
-        val scope = FieldScope(owner)
+        val scope = FieldScope(ownerRef)
 
         val count by scope.field<Int>()
 
         assertEquals("count", count.name)
-        assertEquals(owner, count.owner)
+        assertEquals(ownerRef.thisClass, count.owner)
         assertEquals(klassDescOf<Int>(), count.type)
     }
 }

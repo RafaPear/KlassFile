@@ -1,0 +1,6 @@
+package pt.rafap.klassfile.models
+
+data class OwnerRef<O: Any>(
+    val thisClass: KlassDesc<O>,
+    val inheritor: KlassDesc<O>
+)

@@ -15,24 +15,26 @@ import java.lang.reflect.Modifier
  */
 @MethodScopeDsl
 @KlassFileApi
+@Suppress("UNUSED")
 class MethodScope<O : Any, R : Any>(
     val name: String,
-    override val owner: KlassDesc<O>,
+    override val ownerRef: OwnerRef<O>,
     override val type: KlassDesc<R>,
     private val invokeType: InvokeType,
     private val hasThis: Boolean = true,
     body: MethodScope<O, R>.() -> Unit = {},
-) : TypedRef<O, R> {
+) : OwnedRef<O, R> {
 
     private val params = mutableListOf<ParamRef<*>>()
     private var paramCounter = if (hasThis) 1 else 0
     val receiver: ParamRef.ReceiverRef<O>
-        get() = if (hasThis) ParamRef.ReceiverRef(owner) else throw NoParamFoundError("this")
+        get() = if (hasThis) ParamRef.ReceiverRef(ownerRef.thisClass) else throw NoParamFoundError("this")
 
     private var codeScope: CodeScope<O, R>? = null
     private val flagsScope = FlagsScope.MethodFlagsScope(generateSignatureName())
 
-    private var canDefineParams = true
+    var canDefineParams = true
+    private set
 
     init {
         body()
@@ -40,7 +42,7 @@ class MethodScope<O : Any, R : Any>(
 
     /** Builds a signature string used for flag validation and error messages. */
     private fun generateSignatureName() = buildString {
-        if (invokeType.isSpecial()) append(owner.classDesc.displayName())
+        if (invokeType.isSpecial()) append(ownerRef.thisClass.classDesc.displayName())
         else append(name)
 
         append("(")
@@ -68,8 +70,11 @@ class MethodScope<O : Any, R : Any>(
     inline fun <reified R : Any> defineParam(name: String): ParamRef<R> = defineParam(name, klassDescOf<R>())
 
     /** Adds a lazily named parameter based on the backing property name. */
-    inline fun <reified R : Any> param(): EagerDelegate<ParamRef<R>> = EagerDelegate { _, property ->
-        defineParam(property.name)
+    inline fun <reified R : Any> param(): EagerDelegate<ParamRef<R>> {
+        if (!canDefineParams) throw ParamDefinitionInCodeError(name)
+        return EagerDelegate { _, property ->
+            defineParam(property.name)
+        }
     }
 
     /** Adds a lazily named parameter with an explicit type. */
@@ -89,7 +94,7 @@ class MethodScope<O : Any, R : Any>(
             addAll(params)
         }
 
-        if (codeScope == null) codeScope = CodeScope(name, type, owner, newParams)
+        if (codeScope == null) codeScope = CodeScope(name, type, ownerRef, newParams)
         codeScope?.body()
         isInCode = false
     }
@@ -115,7 +120,7 @@ class MethodScope<O : Any, R : Any>(
 
         return MethodRef(
             name = name,
-            owner = owner,
+            owner = ownerRef.thisClass,
             type = type,
             params = params,
             flags = flags,

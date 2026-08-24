@@ -3,6 +3,7 @@ package pt.rafap.klassfile.builders
 import pt.rafap.klassfile.models.FieldRef
 import pt.rafap.klassfile.models.FieldRef.Companion.field
 import pt.rafap.klassfile.models.KlassDesc
+import pt.rafap.klassfile.models.OwnerRef
 import pt.rafap.klassfile.utils.EagerDelegate
 import pt.rafap.klassfile.utils.FieldScopeDsl
 import pt.rafap.klassfile.utils.klassDescOf
@@ -13,7 +14,7 @@ import java.lang.classfile.ClassBuilder
  */
 @Suppress("UNCHECKED_CAST")
 @FieldScopeDsl
-class FieldScope<O : Any>(val owner: KlassDesc<O>) {
+class FieldScope<O : Any>(val ownerRef: OwnerRef<O>) {
     private var fieldRefs = listOf<FieldRef<O, *>>()
 
     /** Builds a field reference and validates its access flags. */
@@ -26,7 +27,7 @@ class FieldScope<O : Any>(val owner: KlassDesc<O>) {
             .apply { access() }
             .build()
 
-        return FieldRef(name, owner, type, flags)
+        return FieldRef(name, ownerRef.thisClass, type, flags)
     }
 
     /** Adds a field with an explicit name and type. */

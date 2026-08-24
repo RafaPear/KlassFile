@@ -7,6 +7,7 @@ import pt.rafap.klassfile.models.FieldRef
 import pt.rafap.klassfile.models.InvokeType
 import pt.rafap.klassfile.models.KlassDesc
 import pt.rafap.klassfile.models.MethodRef
+import pt.rafap.klassfile.models.OwnerRef
 import pt.rafap.klassfile.utils.*
 import java.lang.classfile.ClassFile
 import java.lang.classfile.ClassFile.ACC_PUBLIC
@@ -18,6 +19,7 @@ import kotlin.jvm.java
 import kotlin.jvm.optionals.getOrNull
 import kotlin.reflect.KClass
 import kotlin.reflect.full.createInstance
+import kotlin.reflect.full.memberFunctions
 
 
 /**
@@ -39,11 +41,10 @@ class KlassFileBuilder<O : Any> private constructor(
     val thisClassDesc = classDesc(name)
 
     /** Kotlin/JVM descriptor for the class being generated. */
-    val thisKlassDesc = KlassDesc(inheritor)
-    val owner = KlassDesc(thisClassDesc, inheritor)
+    val ownerRef = OwnerRef(KlassDesc(thisClassDesc, inheritor), KlassDesc(inheritor))
 
     private val flagsScope = FlagsScope.ClassFlagsScope(name)
-    private val fieldScope = FieldScope(owner)
+    private val fieldScope = FieldScope(ownerRef)
     private val methodRefs = mutableListOf<MethodRef<*, *>>()
     private var hasNoArgsConstructor: Boolean = false
 
@@ -91,7 +92,17 @@ class KlassFileBuilder<O : Any> private constructor(
         invokeType: InvokeType = InvokeType.VIRTUAL,
         builder: MethodScope<O, R>.() -> Unit,
     ): MethodRef<O, R> {
-        val methodRef = MethodScope(name, thisKlassDesc, type, invokeType, body = builder).build()
+        var methodRef = MethodScope(name, ownerRef, type, invokeType, body = builder).build()
+
+        val type = if (ownerRef.thisClass.kClass.java.isInterface) {
+            val hasInInterface = ownerRef.thisClass.kClass.memberFunctions
+                .map { it.toMethodRef(ownerRef.thisClass, KlassDesc(it.returnType)) }
+                .any { it == methodRef }
+
+            if (hasInInterface) InvokeType.INTERFACE else InvokeType.VIRTUAL
+        } else invokeType
+
+        methodRef = methodRef.copy(invokeType = type)
         methodRefs.add(methodRef)
         return methodRef
     }
@@ -157,11 +168,11 @@ class KlassFileBuilder<O : Any> private constructor(
     /** Creates a getter method that reads the provided field. */
 
     fun <T : Any> defineGetter(
-        name: String,
+        name: String? = null,
         field: FieldRef<O, T>,
         access: FlagsScope.MethodFlagsScope.() -> Unit = { public() },
     ) = defineMethod(
-        name,
+        name ?: field.genSetterName(),
         type = field.type,
         invokeType = getInvokeType(field),
     ) {
@@ -178,17 +189,17 @@ class KlassFileBuilder<O : Any> private constructor(
     inline fun <reified T : Any> getter(
         field: FieldRef<O, T>,
         noinline access: FlagsScope.MethodFlagsScope.() -> Unit = { public() },
-    ) = EagerDelegate { _, _ ->
-        defineGetter(field.genGetterName(), field, access)
+    ) = EagerDelegate { _, prop ->
+        defineGetter(prop.name, field, access)
     }
 
     /** Creates a setter method that writes the provided field. */
 
     fun <T : Any> defineSetter(
-        name: String,
+        name: String? = null,
         field: FieldRef<O, T>,
         access: FlagsScope.MethodFlagsScope.() -> Unit = { public() },
-    ) = defineMethod<Unit>(name, invokeType = getInvokeType(field)) {
+    ) = defineMethod<Unit>(name ?: field.genSetterName(), invokeType = getInvokeType(field)) {
         val value by param(field.type)
 
         access { access() }
@@ -203,8 +214,8 @@ class KlassFileBuilder<O : Any> private constructor(
     inline fun <reified T : Any> setter(
         field: FieldRef<O, T>,
         noinline access: FlagsScope.MethodFlagsScope.() -> Unit = { public() },
-    ) = EagerDelegate { _, _ ->
-        defineSetter(field.genSetterName(), field, access)
+    ) = EagerDelegate { _, prop ->
+        defineSetter(prop.name, field, access)
     }
 
     /////// BUILDERS AND LOADERS ///////
@@ -282,11 +293,11 @@ class KlassFileBuilder<O : Any> private constructor(
      * @throws IllegalStateException when one or more required methods are missing.
      */
     private fun checkMethodImplementations() {
-        val kClass = thisKlassDesc.kClass
+        val kClass = ownerRef.inheritor.kClass
 
         val required = kClass.java.methods
             .filter { method -> Modifier.isAbstract(method.modifiers) }
-            .mapNotNull { it.toMethodRef(thisKlassDesc, KlassDesc(it.returnType)) }
+            .mapNotNull { it.toMethodRef(ownerRef.inheritor, KlassDesc(it.returnType)) }
             .toSet()
 
         // 2. Métodos implementados no DSL
@@ -327,14 +338,14 @@ class KlassFileBuilder<O : Any> private constructor(
 
             clb.withFlags(flagsScope.build())
 
-            val thisKClass = thisKlassDesc.kClass
+            val thisKClass = ownerRef.inheritor.kClass
 
-            val desc = thisKlassDesc.kClass.java.describeConstable().getOrNull()
+            val desc = ownerRef.inheritor.kClass.java.describeConstable().getOrNull()
                 ?: throw IllegalStateException("ClassDesc for '$name' is not available. Ensure the class is properly defined.")
 
             if (thisKClass.java.isInterface) clb.withInterfaces(Interfaces.ofSymbols(desc).interfaces())
             else if (thisKClass.isAbstract) clb.withSuperclass(desc)
-            else throw BadInheritError(thisKlassDesc.classDesc.displayName(), desc.displayName())
+            else throw BadInheritError(ownerRef.inheritor.classDesc.displayName(), desc.displayName())
 
             fieldScope.build(clb)
             methodRefs.forEach { m ->
