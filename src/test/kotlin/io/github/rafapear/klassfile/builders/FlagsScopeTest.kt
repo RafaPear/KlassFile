@@ -3,9 +3,7 @@ package io.github.rafapear.klassfile.builders
 import io.github.rafapear.klassfile.utils.DuplicateAccessError
 import io.github.rafapear.klassfile.utils.IncompatibleAccessError
 import io.github.rafapear.klassfile.utils.NoAccessSpecifierError
-import java.lang.classfile.ClassFile.ACC_FINAL
-import java.lang.classfile.ClassFile.ACC_PUBLIC
-import java.lang.classfile.ClassFile.ACC_STATIC
+import java.lang.classfile.ClassFile.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
