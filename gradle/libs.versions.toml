@@ -2,7 +2,7 @@
 # https://docs.gradle.org/current/userguide/version_catalogs.html#sec::toml-dependencies-format
 
 [versions]
-kotlin = "2.4.10"
+kotlin = "2.4.20"
 dokka = "2.2.0"
 sonarqube = "7.3.1.8318"
 nmcp = "0.0.9"
