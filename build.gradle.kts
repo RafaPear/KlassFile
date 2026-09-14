@@ -21,6 +21,7 @@ java {
 
 val javadocJar = tasks.register<Jar>("javadocJar") {
     description = "Assembles Javadoc jar"
+    group = JavaBasePlugin.DOCUMENTATION_GROUP
     dependsOn(tasks.dokkaGenerateHtml)
     archiveClassifier.set("javadoc")
     from(tasks.dokkaGenerateHtml)
@@ -71,8 +72,8 @@ publishing {
 
 nmcp {
     publishAllPublications {
-        username = providers.gradleProperty("centralUsername").get()
-        password = providers.gradleProperty("centralPassword").get()
+        username = providers.gradleProperty("centralUsername").orNull
+        password = providers.gradleProperty("centralPassword").orNull
         publicationType = "AUTOMATIC"
     }
 }
