@@ -77,6 +77,19 @@ class KlassFileBuilder<O : Any> private constructor(
         access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
     ): FieldRef<O, T> = fieldScope.defineField(name, type, access)
 
+    /**
+     * Registers a field in the generated class with the specified type and access flags.
+     *
+     * The field name is inferred from the property name in the DSL context.
+     *
+     * @param access a lambda to configure the field's access flags using [FlagsScope.FieldFlagsScope]. Defaults to `private`.
+     */
+
+    inline fun <reified T : Any> defineField(
+        name: String,
+        noinline access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
+    ): FieldRef<O, T> = defineField(name, klassDescOf<T>(), access)
+
     /** Adds a delegated field using a reified Kotlin type. */
     inline fun <reified T : Any> field(
         noinline access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },

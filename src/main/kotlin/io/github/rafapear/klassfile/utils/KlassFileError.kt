@@ -131,6 +131,17 @@ class StackTypeMismatchError(expected: KlassDesc<*>, actual: KlassDesc<*>, codeS
                 "Please ensure that the stack has the correct types before popping."
 }
 
+class StackTopIsNotAnArrayError(actual: StackValue, codeScope: CodeScope<*, *>) : KlassFileError() {
+    init {
+        codeScope.printInfo()
+    }
+
+    override val message: String =
+        "The stack in '${codeScope.scopeName}' has a type mismatch. " +
+                "Expected an array type, but found '${actual.type.classDesc.displayName()}'. " +
+                "Please ensure that the stack has an array type before popping."
+}
+
 class StackReferenceTypeExpectedError(actual: StackValue, codeScope: CodeScope<*, *>) : KlassFileError() {
     init {
         codeScope.printInfo()
@@ -215,10 +226,31 @@ class UnsupportedKotlinArrayOfPrimitivesError : KlassFileError() {
                 "Use the corresponding primitive array type instead (e.g. IntArray, LongArray, FloatArray, DoubleArray, CharArray, BooleanArray, ByteArray or ShortArray).\n\n"
 }
 
+class ArrayTypeInNewArrayError(type: KlassDesc<*>, codeScope: CodeScope<*, *>) : KlassFileError() {
+    init {
+        codeScope.printInfo()
+    }
+
+    override val message: String =
+        "Cannot create a new array of type '${type.classDesc.displayName()}' in '${codeScope.scopeName}'. " +
+                "Use multidimensional arrays or the corresponding primitive array types instead. " +
+                "Please ensure that the type is a valid array type before creating a new array."
+}
+
 class NestedCodeScopes(methodScope: MethodScope<*, *>) : KlassFileError() {
     override val message: String =
         "A code block is being defined inside another code block in '${methodScope.name}'. " +
                 "Please define the inner code block outside of the outer one."
+}
+
+class CannotCheckCastPrimitiveTypeError(codeScope: CodeScope<*, *>, type: KlassDesc<*>, actual: KlassDesc<*>) : KlassFileError() {
+    init {
+        codeScope.printInfo()
+    }
+
+    override val message: String =
+        "Cannot check cast from '${actual.classDesc.displayName()}' to '${type.classDesc.displayName()}' in '${codeScope.scopeName}'. " +
+                "Please ensure that the types are compatible before performing the check cast."
 }
 
 class MissingImplementationsError(

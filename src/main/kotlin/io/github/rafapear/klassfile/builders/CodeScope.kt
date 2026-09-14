@@ -5,7 +5,6 @@ import io.github.rafapear.klassfile.models.StackType.Companion.stackType
 import io.github.rafapear.klassfile.utils.*
 import java.lang.classfile.ClassFile.ACC_STATIC
 import java.lang.classfile.CodeBuilder
-import java.lang.classfile.TypeKind
 import java.lang.constant.ConstantDescs
 import kotlin.reflect.KClass
 
@@ -639,60 +638,64 @@ class CodeScope<O : Any, R : Any>(
      *
      * @throws UnsupportedOperationException if the operand type is not supported.
      */
-    fun convert(destType: KClass<*>) {
-        val top = stack.pop()
-        when (val topType = top.type.kClass) {
-            Int::class -> {
-                when (destType) {
-                    Long::class -> raw { i2l() }
-                    Float::class -> raw { i2f() }
-                    Double::class -> raw { i2d() }
-                    Byte::class -> raw { i2b() }
-                    Char::class -> raw { i2c() }
-                    Short::class -> raw { i2s() }
-                    else -> throw UnsupportedOperationException("Conversion from Int to ${destType.simpleName} is not supported.")
-                }
-            }
+    fun convertTo(destType: KClass<*>) {
+        val top = stack.peek()
+        val fromType = top.type.kClass
 
-            Long::class -> {
-                when (destType) {
-                    Int::class -> raw { l2i() }
-                    Float::class -> raw { l2f() }
-                    Double::class -> raw { l2d() }
-                    else -> throw UnsupportedOperationException("Conversion from Long to ${destType.simpleName} is not supported.")
-                }
-            }
-
-            Float::class -> {
-                when (destType) {
-                    Int::class -> raw { f2i() }
-                    Long::class -> raw { f2l() }
-                    Double::class -> raw { f2d() }
-                    else -> throw UnsupportedOperationException("Conversion from Float to ${destType.simpleName} is not supported.")
-                }
-            }
-
-            Double::class -> {
-                when (destType) {
-                    Int::class -> raw { d2i() }
-                    Long::class -> raw { d2l() }
-                    Float::class -> raw { d2f() }
-                    else -> throw UnsupportedOperationException("Conversion from Double to ${destType.simpleName} is not supported.")
-                }
-            }
-
-            else -> throw UnsupportedOperationException("Conversion from ${topType.simpleName} to ${destType.simpleName} is not supported.")
+        val from = when (fromType) {
+            Byte::class, Short::class, Char::class, Boolean::class, Int::class -> Int::class
+            else -> fromType
         }
 
-        val resultType = when (destType) {
-            Byte::class, Short::class, Char::class -> Int::class
+        val to = when (destType) {
+            Byte::class, Short::class, Char::class, Boolean::class, Int::class -> Int::class
             else -> destType
         }
 
-        stack.push(top.withType(KlassDesc(resultType)))
+        if (from != to) {
+            when (from to to) {
+                Int::class to Long::class -> raw { i2l() }
+                Int::class to Float::class -> raw { i2f() }
+                Int::class to Double::class -> raw { i2d() }
+
+                Long::class to Int::class -> raw { l2i() }
+                Long::class to Float::class -> raw { l2f() }
+                Long::class to Double::class -> raw { l2d() }
+
+                Float::class to Int::class -> raw { f2i() }
+                Float::class to Long::class -> raw { f2l() }
+                Float::class to Double::class -> raw { f2d() }
+
+                Double::class to Int::class -> raw { d2i() }
+                Double::class to Long::class -> raw { d2l() }
+                Double::class to Float::class -> raw { d2f() }
+
+                else -> throw UnsupportedOperationException(
+                    "Conversion from ${fromType.simpleName} to ${destType.simpleName} is not supported."
+                )
+            }
+        }
+
+        if (to == Int::class && destType != Int::class) {
+            when (destType) {
+                Boolean::class -> raw {
+                    iconst_1()
+                    iand()
+                }
+
+                Byte::class -> raw { i2b() }
+                Char::class -> raw { i2c() }
+                Short::class -> raw { i2s() }
+            }
+        }
+
+        stack.pop()
+        stack.push(
+            top.withType(KlassDesc(destType))
+        )
     }
 
-    inline fun <reified T : Any> convert() = convert(T::class)
+    inline fun <reified T : Any> convertTo() = convertTo(T::class)
 
     /**
      * Compares two numeric values on the stack and pushes an integer result.
@@ -748,28 +751,21 @@ class CodeScope<O : Any, R : Any>(
         raw { labelBinding(getLabel()) }
     }
 
-    fun KlassDesc<*>.toTypeKind(): TypeKind? =
-        when (kClass) {
-            Boolean::class -> TypeKind.BOOLEAN
-            Byte::class -> TypeKind.BYTE
-            Char::class -> TypeKind.CHAR
-            Short::class -> TypeKind.SHORT
-            Int::class -> TypeKind.INT
-            Long::class -> TypeKind.LONG
-            Float::class -> TypeKind.FLOAT
-            Double::class -> TypeKind.DOUBLE
-            else -> null
-        }
-
     fun newArray(type: KlassDesc<*>) {
         stack.pop(klassDescOf<Int>())
+
+        if (type.classDesc.isArray) {
+            throw ArrayTypeInNewArrayError(type, this)
+        }
 
         val kind = type.toTypeKind()
 
         if (kind != null) raw { newarray(kind) }
         else raw { anewarray(type.classDesc) }
 
-        stack.push(StackValue.Reference.NewArrayObject(type))
+        val arrStackValue = StackValue.Reference.NewArrayObject(type)
+
+        stack.push(arrStackValue)
     }
 
     fun newMultiArray(type: KlassDesc<*>, dimensions: Int) {
@@ -784,11 +780,7 @@ class CodeScope<O : Any, R : Any>(
 
         val array = value.type
         if (array !is KlassDesc.ArrayKlassDesc<*>) {
-            throw StackTypeMismatchError(
-                klassDescOf<Array<*>>(),
-                value.type,
-                this
-            )
+            throw StackTopIsNotAnArrayError(value, this)
         }
 
         return array
@@ -892,9 +884,14 @@ class CodeScope<O : Any, R : Any>(
     fun checkCast(type: KlassDesc<*>) {
         val value = stack.pop()
 
+        if (type.classDesc.isPrimitive || type.kClass != Any::class)
+            throw CannotCheckCastPrimitiveTypeError(this, type, value.type)
+
         raw { checkcast(type.classDesc) }
 
-        stack.push(value.withType(type))
+        val newValue = value.withType(type)
+
+        stack.push(newValue)
     }
 
     inline fun <reified T : Any> checkCast() =

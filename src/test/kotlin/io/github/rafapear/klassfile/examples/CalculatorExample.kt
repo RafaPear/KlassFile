@@ -26,7 +26,7 @@ class CalculatorExample {
         name: String,
         getSum: MethodRef<Calculator, Int>,
         sum: FieldRef<Calculator, Int>,
-        op: CodeScope<*, *>.() -> Unit
+        op: CodeScope<*, *>.() -> Unit,
     ) {
         defineMethod<Int>(name) {
             access { public() }
