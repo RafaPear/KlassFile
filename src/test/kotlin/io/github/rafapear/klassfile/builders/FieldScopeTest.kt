@@ -5,10 +5,44 @@ import io.github.rafapear.klassfile.utils.klassDescOf
 import java.lang.classfile.ClassFile.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class FieldScopeTest {
 
     private val ownerRef = OwnerRef(klassDescOf<String>(), klassDescOf<String>())
+
+    @Test
+    fun `defining the same field in multiple ways returns a similar reference`() {
+        val scope = FieldScope(ownerRef)
+
+        val field1 = scope.defineField<Int>("field1")
+        val field2 by scope.field<Int>()
+        val field3 = scope.defineField("field3", klassDescOf<Int>())
+
+        val list = listOf(field1, field2, field3)
+
+        assertTrue {
+            list.all {
+                it.type == field1.type && it.owner == field1.owner && it.flags == field1.flags
+            }
+        }
+    }
+
+    @Test
+    fun `comparing different type fields returns false`() {
+        val scope = FieldScope(ownerRef)
+
+        val field1 = scope.defineField<Int>("field1")
+        val field2 by scope.field<Float>()
+        val field3 = scope.defineField<Unit>("field3")
+
+        val list = listOf(field1, field2, field3)
+
+        assertFalse {
+            list.all { it.type == field1.type && it.owner == field1.owner && it.flags == field1.flags }
+        }
+    }
 
     @Test
     fun `field creates reference`() {
