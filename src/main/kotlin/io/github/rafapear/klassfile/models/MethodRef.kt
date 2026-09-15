@@ -25,6 +25,9 @@ data class MethodRef<O : Any, T : Any>(
         *params.map { it.type.classDesc }.toTypedArray()
     )
 
+    fun <T: Any> withType(type: KlassDesc<T>): MethodRef<O, T> =
+        MethodRef(name, owner, type, params, flags, invokeType, code)
+
     /**
      * Formats the reference as a human-readable signature including modifiers,
      * owner, invocation kind, parameters, and return type.

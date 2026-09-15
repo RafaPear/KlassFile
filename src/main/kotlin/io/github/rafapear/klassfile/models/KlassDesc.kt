@@ -2,6 +2,7 @@ package io.github.rafapear.klassfile.models
 
 import io.github.rafapear.klassfile.utils.classDesc
 import io.github.rafapear.klassfile.utils.nullableClassDesc
+import java.lang.classfile.TypeKind
 import java.lang.constant.ClassDesc
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
@@ -43,6 +44,18 @@ open class KlassDesc<T : Any>(
     )
 
     fun array() = ArrayKlassDesc(this)
+
+    fun toTypeKind(): TypeKind? = when (kClass) {
+        Boolean::class -> TypeKind.BOOLEAN
+        Byte::class -> TypeKind.BYTE
+        Char::class -> TypeKind.CHAR
+        Short::class -> TypeKind.SHORT
+        Int::class -> TypeKind.INT
+        Long::class -> TypeKind.LONG
+        Float::class -> TypeKind.FLOAT
+        Double::class -> TypeKind.DOUBLE
+        else -> null
+    }
 
     /**
      * Returns whether this descriptor accepts [other] by JVM assignability rules.

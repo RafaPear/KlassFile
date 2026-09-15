@@ -21,7 +21,7 @@ java {
 
 val javadocJar = tasks.register<Jar>("javadocJar") {
     description = "Assembles Javadoc jar"
-    group = JavaBasePlugin.DOCUMENTATION_GROUP
+    group = "build"
     dependsOn(tasks.dokkaGenerateHtml)
     archiveClassifier.set("javadoc")
     from(tasks.dokkaGenerateHtml)
