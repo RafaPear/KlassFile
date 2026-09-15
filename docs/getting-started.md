@@ -3,7 +3,7 @@
 KlassFile creates a concrete implementation of an interface or abstract class. The type argument to `klassFile<T>` is the type the generated class implements or extends; `name` is the generated class's binary name.
 
 ```kotlin
-import pt.rafap.klassfile.utils.klassFile
+import io.github.rafapear.klassfile.utils.klassFile
 
 interface Greeter {
     fun greet(): String
