@@ -1,5 +1,7 @@
 # KlassFile
 
+dump
+
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.rafapear/klassfile.svg)](https://central.sonatype.com/artifact/io.github.rafapear/klassfile)
 [![Quality gate status](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=coverage)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
