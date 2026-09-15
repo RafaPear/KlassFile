@@ -129,37 +129,6 @@ Kotlin types do not remove every runtime concern: generic arguments are erased o
 | Local Variables API                          | ✅ Complete                                         |
 | Invokedynamic / Lambdas                      | ❌ Not Planned                                      |
 
-## Test Coverage Status
-
-| Test           | Status    |
-|----------------|-----------|
-| Argument Scope | ✅ Covered |
-| Field Scope    | ✅ Covered |
-| Flags Scope    | ✅ Covered |
-| Method Scope   | ✅ Covered |
-| Code Scope     | ✅ Covered |
-| CustomRange    | ✅ Covered |
-| FieldRef       | ✅ Covered |
-| InvokeType     | ✅ Covered |
-| KlassDesc      | ✅ Covered |
-| LabelRef       | ✅ Covered |
-| LocalRef       | ✅ Covered |
-| LocalsStorage  | ✅ Covered |
-| MethodRef      | ✅ Covered |
-| OrderedRef     | ✅ Covered |
-| ParamRef       | ✅ Covered |
-| Stack          | ✅ Covered |
-| StackType      | ✅ Covered |
-| StackValue     | ✅ Covered |
-| WhileRef       | ✅ Covered |
-| ClassDescUtils | ✅ Covered |
-| CodeScopeUtils | ⏳ Pending |
-| EagerDelegate  | ⏳ Pending |
-| KlassFileError | ⏳ Pending |
-| KlassFileUtils | ⏳ Pending |
-| Logging        | ⏳ Pending |
-| MethodRefUtils | ⏳ Pending |
-
 
 # Example
 
