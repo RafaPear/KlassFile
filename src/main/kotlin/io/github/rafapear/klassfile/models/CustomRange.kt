@@ -1,6 +1,10 @@
 package io.github.rafapear.klassfile.models
 
+import io.github.rafapear.klassfile.utils.NoTestCoverage
+
 sealed class CustomRange<T : Any, R : Any>(val start: T, val end: R, val endInclusive: Boolean) {
+
+    @NoTestCoverage
     override fun toString() = if (endInclusive) {
         "${start}..$end"
     } else {

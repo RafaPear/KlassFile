@@ -11,7 +11,7 @@ class ArrayExample {
     }
 
     @Test
-    fun `Implement a sum interface that sums all numbers in a array`(){
+    fun `Implement a sum interface that sums all numbers in a array`() {
         val accumulator = klassFile<Accumulator>("AccumulatorImpl") {
             access { public() }
 

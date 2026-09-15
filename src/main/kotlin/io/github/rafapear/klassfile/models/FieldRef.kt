@@ -1,5 +1,6 @@
 package io.github.rafapear.klassfile.models
 
+import io.github.rafapear.klassfile.utils.NoTestCoverage
 import io.github.rafapear.klassfile.utils.toModifiers
 import java.lang.classfile.ClassBuilder
 import java.lang.classfile.ClassFile.ACC_STATIC
@@ -16,7 +17,10 @@ data class FieldRef<O : Any, T : Any>(
     /** True when the field is declared with the `static` modifier. */
     val isStatic: Boolean = flags and ACC_STATIC != 0
 
+    fun <T: Any> withType(type: KlassDesc<T>): FieldRef<O, T> = FieldRef(name, owner, type, flags)
+
     /** Returns a human-readable field signature with modifiers and owner. */
+    @NoTestCoverage
     override fun toString() = buildString {
         val modifiers = toModifiers(flags)
         if (modifiers.isNotEmpty())
