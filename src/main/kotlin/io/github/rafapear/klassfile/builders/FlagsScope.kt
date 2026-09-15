@@ -1,9 +1,6 @@
 package io.github.rafapear.klassfile.builders
 
-import io.github.rafapear.klassfile.utils.DuplicateAccessError
-import io.github.rafapear.klassfile.utils.FlagsScopeDsl
-import io.github.rafapear.klassfile.utils.IncompatibleAccessError
-import io.github.rafapear.klassfile.utils.NoAccessSpecifierError
+import io.github.rafapear.klassfile.utils.*
 import java.lang.classfile.ClassFile.*
 
 @Suppress("unused")
@@ -18,41 +15,111 @@ import java.lang.classfile.ClassFile.*
 sealed class FlagsScope(val scopeName: String) {
 
     private companion object {
-        const val ACCESS_MASK = ACC_PUBLIC or ACC_PRIVATE or ACC_PROTECTED
+        const val ACCESS_MASK =
+            ACC_PUBLIC or ACC_PRIVATE or ACC_PROTECTED
     }
 
-    protected var flags = 0
-    private var access = 0
+    private var flags = 0
 
-    /** Applies a JVM flag while enforcing access-modifier exclusivity. */
-    fun applyFlag(flag: Int) {
-        when (flag) {
-            ACC_PUBLIC,
-            ACC_PRIVATE,
-            ACC_PROTECTED,
-                -> {
-                if (access != 0) {
-                    throw IncompatibleAccessError(this, access)
-                }
-                access = flag
-            }
-
-            else -> {
-                if ((flags and flag) != 0) {
-                    throw DuplicateAccessError(this, flags, flag)
-                }
-                flags = flags or flag
-            }
+    private val incompatibleFlags: Set<Set<Int>>
+        get() = when (this) {
+            is ClassFlagsScope -> classIncompatible
+            is MethodFlagsScope -> methodIncompatible
+            is FieldFlagsScope -> fieldIncompatible
         }
+
+    private val fieldIncompatible = setOf(
+        setOf(ACC_FINAL, ACC_VOLATILE),
+    )
+
+    private val methodIncompatible = setOf(
+        setOf(ACC_ABSTRACT, ACC_FINAL),
+        setOf(ACC_ABSTRACT, ACC_NATIVE),
+        setOf(ACC_ABSTRACT, ACC_STATIC),
+        setOf(ACC_ABSTRACT, ACC_STRICT),
+        setOf(ACC_ABSTRACT, ACC_SYNCHRONIZED),
+    )
+
+    private val classIncompatible = setOf(
+        setOf(ACC_FINAL, ACC_ABSTRACT),
+    )
+
+    /**
+     * Applies a JVM flag while enforcing access-modifier exclusivity
+     * and incompatible-flag constraints.
+     */
+    fun applyFlag(flag: Int) {
+        if ((flag and ACCESS_MASK) != 0) {
+            applyAccessFlag(flag)
+            return
+        }
+
+        applyRegularFlag(flag)
     }
 
-    /** Returns the final bit mask once a single access modifier has been selected. */
+    private fun checkDuplicate(flag: Int): Boolean {
+        return (flags and flag) != 0
+    }
+
+    /**
+     * Applies an access modifier.
+     *
+     * Only one of `public`, `protected` or `private` may be present.
+     */
+    private fun applyAccessFlag(flag: Int) {
+        if (checkDuplicate(flag)) return
+
+        val existingAccess = flags and ACCESS_MASK
+
+        if (existingAccess != 0) {
+            throw IncompatibleAccessError(
+                this,
+                existingAccess,
+                flag
+            )
+        }
+
+        flags = flags or flag
+    }
+
+    /**
+     * Applies a non-access JVM flag while checking incompatible combinations
+     * and duplicate flags.
+     */
+    private fun applyRegularFlag(flag: Int) {
+        if (checkDuplicate(flag)) return
+
+        val incompatibleGroup = incompatibleFlags.firstOrNull { group ->
+            flag in group &&
+                    group.any { existing ->
+                        existing != flag && (flags and existing) != 0
+                    }
+        }
+
+        if (incompatibleGroup != null) {
+            val existingFlag = incompatibleGroup.first {
+                it != flag && (flags and it) != 0
+            }
+
+            throw IncompatibleFlagsError(
+                this,
+                existingFlag,
+                flag,
+            )
+        }
+
+        flags = flags or flag
+    }
+
+    /**
+     * Returns the final bit mask once a single access modifier has been selected.
+     */
     fun build(): Int {
-        if (access == 0) {
+        if ((flags and ACCESS_MASK) == 0) {
             throw NoAccessSpecifierError(scopeName)
         }
 
-        return access or flags
+        return flags
     }
 
     /**
@@ -65,6 +132,7 @@ sealed class FlagsScope(val scopeName: String) {
 
     /** Flag scope for classes and interfaces. */
     class ClassFlagsScope(scopeName: String) : FlagsScope("class $scopeName") {
+
         /** Applies `public` visibility. */
         fun public() = applyFlag(ACC_PUBLIC)
 
@@ -95,13 +163,14 @@ sealed class FlagsScope(val scopeName: String) {
                 ACC_ABSTRACT -> "abstract"
                 ACC_SUPER -> "super"
                 ACC_SYNTHETIC -> "synthetic"
-                else -> throw IllegalArgumentException("Unknown flag: ${flag.toHexString()}")
+                else -> throw UnknownFlagError(this, flag)
             }
         }
     }
 
     /** Flag scope for methods and constructors. */
     class MethodFlagsScope(scopeName: String) : FlagsScope("method $scopeName") {
+
         /** Applies `public` visibility. */
         fun public() = applyFlag(ACC_PUBLIC)
 
@@ -152,13 +221,14 @@ sealed class FlagsScope(val scopeName: String) {
                 ACC_ABSTRACT -> "abstract"
                 ACC_STRICT -> "strict"
                 ACC_SYNTHETIC -> "synthetic"
-                else -> throw IllegalArgumentException("Unknown flag: ${flag.toHexString()}")
+                else -> throw UnknownFlagError(this, flag)
             }
         }
     }
 
     /** Flag scope for fields. */
     class FieldFlagsScope(scopeName: String) : FlagsScope("field $scopeName") {
+
         /** Applies `public` visibility. */
         fun public() = applyFlag(ACC_PUBLIC)
 
@@ -197,7 +267,7 @@ sealed class FlagsScope(val scopeName: String) {
                 ACC_TRANSIENT -> "transient"
                 ACC_SYNTHETIC -> "synthetic"
                 ACC_ENUM -> "enum"
-                else -> throw IllegalArgumentException("Unknown flag: ${flag.toHexString()}")
+                else -> throw UnknownFlagError(this, flag)
             }
         }
     }
