@@ -16,7 +16,7 @@ The API has two levels. Low-level `CodeScope` functions are thin Kotlin wrappers
 
 While emitting code, KlassFile tracks a subset of operand-stack and local-variable invariants. This can report many mistakes at the DSL call site, before a generated class reaches the JVM verifier.
 
-> **Status:** Work in progress. KlassFile generates new classes; it does not parse or transform existing `.class` files. Exception handling and `invokedynamic` are not implemented.
+> **Status:** Work in progress. KlassFile generates new classes; you can find the current DSL reference in the [docs](docs/dsl-reference.md). The project is under active development, and contributions are welcome.
 
 ## Why KlassFile?
 
