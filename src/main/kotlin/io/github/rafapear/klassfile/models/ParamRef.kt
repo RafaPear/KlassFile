@@ -19,6 +19,8 @@ open class ParamRef<T : Any>(
      */
     class ReceiverRef<T : Any>(type: KlassDesc<T>) : ParamRef<T>("this", type, 0)
 
+    fun <T: Any> withType(type: KlassDesc<T>): ParamRef<T> = ParamRef(name, type, order)
+
     /** Returns a compact `name: type` representation for diagnostics. */
     override fun toString() = "$name: $type"
 }

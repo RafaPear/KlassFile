@@ -1,14 +1,12 @@
 # KlassFile
 
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.rafapear/klassfile.svg)](https://central.sonatype.com/artifact/io.github.rafapear/klassfile)
 [![Quality gate status](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
-[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=coverage)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
 [![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
 [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
 [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
-
-> ⚠️ WORK IN PROGRESS ⚠️
 
 KlassFile is a Kotlin DSL for **generating** JVM class files with Java's `java.lang.classfile` API.
 
@@ -48,6 +46,57 @@ KlassFile is not a Kotlin compiler, and it does not parse or transform existing 
 - [Validation and errors](docs/validation.md)
 - [Examples](docs/examples.md)
 
+## Importing the library
+
+KlassFile is published to Maven Central. Add the dependency to your project using one of the examples below.
+
+- Gradle (Kotlin DSL - build.gradle.kts)
+
+```kotlin
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Replace the version with the version you want to use (e.g. "0.1.0")
+    implementation("io.github.rafapear:klassfile:0.1.0")
+}
+```
+
+- Gradle (Groovy DSL - build.gradle)
+
+```groovy
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Replace the version with the version you want to use (e.g. '0.1.0')
+    implementation 'io.github.rafapear:klassfile:0.1.0'
+}
+```
+
+- Maven (pom.xml)
+
+```xml
+<repositories>
+  <repository>
+    <id>central</id>
+    <url>https://repo1.maven.org/maven2/</url>
+  </repository>
+</repositories>
+
+<dependencies>
+  <dependency>
+    <groupId>io.github.rafapear</groupId>
+    <artifactId>klassfile</artifactId>
+    <version>0.1.0</version>
+  </dependency>
+</dependencies>
+```
+
+Tip: the project publishes sources and javadoc artifacts; if you rely on a snapshot or a different release, change the version accordingly.
+
 ## Design goals
 
 KlassFile is not a replacement for JVM bytecode knowledge. Its goal is to make common class-file construction more concise and discoverable in Kotlin while retaining direct control over emitted bytecode.
@@ -80,38 +129,6 @@ Kotlin types do not remove every runtime concern: generic arguments are erased o
 | Local Variables API                          | ✅ Complete                                         |
 | Invokedynamic / Lambdas                      | ❌ Not Planned                                      |
 
-## Test Suite Status
-
-| Test Suite       | Status     |
-|------------------|------------|
-| Argument Scope   | ✅ Complete |
-| Field Scope      | ✅ Complete |
-| Flags Scope      | ✅ Complete |
-| Method Scope     | ⏳ Pending  |
-| Code Scope       | ⏳ Pending  |
-| Class Scope      | ⏳ Pending  |
-| Locals Storage   | ⏳ Pending  |
-| Stack            | ⏳ Pending  |
-| LabelRef         | ⏳ Pending  |
-| WhileRef         | ⏳ Pending  |
-| LocalRef         | ⏳ Pending  |
-| ParamRef         | ⏳ Pending  |
-| OrderedRef       | ⏳ Pending  |
-| TypedRef         | ⏳ Pending  |
-| FieldRef         | ⏳ Pending  |
-| MethodRef        | ⏳ Pending  |
-| KlassDesc        | ⏳ Pending  |
-| Invoke Type      | ⏳ Pending  |
-| Stack Type       | ⏳ Pending  |
-| Stack Value      | ⏳ Pending  |
-| Instruction      | ⏳ Pending  |
-| Method Resolver  | ⏳ Pending  |
-| ClassDesc Utils  | ⏳ Pending  |
-| CodeScope Utils  | ⏳ Pending  |
-| Eager Delegate   | ⏳ Pending  |
-| KlassFile Errors | ⏳ Pending  |
-| KlassFile Utils  | ⏳ Pending  |
-| MethodRef Utils  | ⏳ Pending  |
 
 # Example
 

@@ -20,7 +20,7 @@ class FieldScope<O : Any>(val ownerRef: OwnerRef<O>) {
     /** Builds a field reference and validates its access flags. */
     private fun <T : Any> buildFieldRef(
         name: String,
-        type: KlassDesc<T> = klassDescOf<Unit>() as KlassDesc<T>,
+        type: KlassDesc<T>,
         access: FlagsScope.FieldFlagsScope.() -> Unit,
     ): FieldRef<O, T> {
         val flags = FlagsScope.FieldFlagsScope(name)
@@ -33,7 +33,7 @@ class FieldScope<O : Any>(val ownerRef: OwnerRef<O>) {
     /** Adds a field with an explicit name and type. */
     fun <T : Any> defineField(
         name: String,
-        type: KlassDesc<T> = klassDescOf<Unit>() as KlassDesc<T>,
+        type: KlassDesc<T>,
         access: FlagsScope.FieldFlagsScope.() -> Unit = { private() },
     ): FieldRef<O, T> {
         val fieldRef = buildFieldRef(name, type, access)

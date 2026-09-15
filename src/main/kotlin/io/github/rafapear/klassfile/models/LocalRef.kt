@@ -17,6 +17,8 @@ open class LocalRef<T : Any>(
     override val owner: KlassDesc<Any>
         get() = error("No owner available")
 
+    fun <T: Any> withType(type: KlassDesc<T>): LocalRef<T> = LocalRef(name, type, order, isInitialized)
+
     /** Returns a compact `name: type` representation for diagnostics. */
     override fun toString() = "$name: $type"
 }
