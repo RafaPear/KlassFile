@@ -5,6 +5,7 @@
 kotlin = "2.4.10"
 dokka = "2.2.0"
 sonarqube = "7.3.1.8318"
+nmcp = "0.0.9"
 
 [libraries]
 
@@ -12,3 +13,4 @@ sonarqube = "7.3.1.8318"
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 sonarqube = { id = "org.sonarqube", version.ref = "sonarqube" }
+nmcp = { id = "com.gradleup.nmcp", version.ref = "nmcp" }

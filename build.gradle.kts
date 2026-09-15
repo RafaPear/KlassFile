@@ -1,12 +1,86 @@
 plugins {
-    // Apply the org.jetbrains.kotlin.jvm Plugin to add support for Kotlin.
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.dokka)
     alias(libs.plugins.sonarqube)
+    alias(libs.plugins.nmcp)
     jacoco
+    `maven-publish`
+    signing
+}
 
-    // Apply the ktlint plugin for code style checking.
-    // id("org.jlleitschuh.gradle.ktlint")
+group = "io.github.rafapear"
+version = providers.gradleProperty("version").orElse("0.0.0-SNAPSHOT").get()
+
+kotlin {
+    jvmToolchain(24)
+}
+
+java {
+    withSourcesJar()
+}
+
+val javadocJar = tasks.register<Jar>("javadocJar") {
+    description = "Assembles Javadoc jar"
+    group = "build"
+    dependsOn(tasks.dokkaGenerateHtml)
+    archiveClassifier.set("javadoc")
+    from(tasks.dokkaGenerateHtml)
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("mavenKotlin") {
+            from(components["kotlin"])
+
+            artifactId = "klassfile"
+
+            artifact(tasks.named<Jar>("sourcesJar"))
+            artifact(javadocJar)
+
+            pom {
+                name = "KlassFile"
+                description =
+                    "A Kotlin DSL for generating JVM class files with Java's java.lang.classfile API."
+                url = "https://github.com/RafaPear/KlassFile"
+
+                licenses {
+                    license {
+                        name = "MIT License"
+                        url = "https://opensource.org/licenses/MIT"
+                    }
+                }
+
+                developers {
+                    developer {
+                        id = "RafaPear"
+                        name = "Rafael Pereira"
+                        url = "https://github.com/RafaPear"
+                    }
+                }
+
+                scm {
+                    connection =
+                        "scm:git:git://github.com/RafaPear/KlassFile.git"
+                    developerConnection =
+                        "scm:git:ssh://github.com/RafaPear/KlassFile.git"
+                    url = "https://github.com/RafaPear/KlassFile"
+                }
+            }
+        }
+    }
+}
+
+nmcp {
+    publishAllPublications {
+        username = providers.gradleProperty("centralUsername").orNull
+        password = providers.gradleProperty("centralPassword").orNull
+        publicationType = "AUTOMATIC"
+    }
+}
+
+signing {
+    useGpgCmd()
+    sign(publishing.publications["mavenKotlin"])
 }
 
 val generateDokkaModule = tasks.register<Copy>("generateDokkaModule") {

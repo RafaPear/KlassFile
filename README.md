@@ -1,14 +1,110 @@
 # KlassFile
 
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.rafapear/klassfile.svg)](https://central.sonatype.com/artifact/io.github.rafapear/klassfile)
 [![Quality gate status](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
-[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=coverage)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
 [![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
 [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
 [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=RafaPear_KlassFile&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=RafaPear_KlassFile)
 
-> ⚠️ WORK IN PROGRESS ⚠️
+KlassFile is a Kotlin DSL for **generating** JVM class files with Java's `java.lang.classfile` API.
+
+It provides Kotlin-friendly builders for classes, fields, methods, parameters, local variables, control flow, and common bytecode instructions. Reified type parameters and `KlassDesc` values let most code use Kotlin types instead of handwritten JVM descriptors.
+
+The API has two levels. Low-level `CodeScope` functions are thin Kotlin wrappers around individual Java ClassFile `CodeBuilder` instructions, adding typed references and operand-stack tracking. Higher-level helpers such as `if_`, `while_`, `for_`, getters, setters, and `instantiate` compose those lower-level instructions into common bytecode patterns.
+
+While emitting code, KlassFile tracks a subset of operand-stack and local-variable invariants. This can report many mistakes at the DSL call site, before a generated class reaches the JVM verifier.
+
+> **Status:** Work in progress. KlassFile generates new classes; it does not parse or transform existing `.class` files. Exception handling and `invokedynamic` are not implemented.
+
+## Why KlassFile?
+
+Generating JVM bytecode directly is powerful, but it is also low-level: callers must manage descriptors, local-variable slots, operand-stack order, labels, branches, and invocation opcodes.
+
+KlassFile keeps that control while providing a Kotlin-first DSL. It represents fields, methods, parameters, locals, and labels as typed references; tracks a subset of JVM stack invariants; and builds common control-flow patterns from ordinary Kotlin expressions.
+
+Use KlassFile when you need to generate a new JVM class at runtime—for example, to implement an interface or abstract class dynamically—without manually assembling every class-file instruction.
+
+KlassFile is not a Kotlin compiler, and it does not parse or transform existing `.class` files.
+
+## Requirements
+
+- JDK 24 or later (the project is configured for Java 24).
+- Kotlin 2.4.10 or compatible.
+
+## Documentation
+
+- [Getting started](docs/getting-started.md)
+- [Builders and scopes](docs/builders-and-scopes.md)
+- [Classes, fields, and methods](docs/classes-and-members.md)
+- [Types and member references](docs/types-and-references.md)
+- [References and operand stack](docs/references-and-stack.md)
+- [Complete DSL reference](docs/dsl-reference.md)
+- [Bytecode instructions](docs/bytecode.md)
+- [Control flow and arrays](docs/control-flow-and-arrays.md)
+- [Validation and errors](docs/validation.md)
+- [Examples](docs/examples.md)
+
+## Importing the library
+
+KlassFile is published to Maven Central. Add the dependency to your project using one of the examples below.
+
+- Gradle (Kotlin DSL - build.gradle.kts)
+
+```kotlin
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Replace the version with the version you want to use (e.g. "0.1.0")
+    implementation("io.github.rafapear:klassfile:0.1.0")
+}
+```
+
+- Gradle (Groovy DSL - build.gradle)
+
+```groovy
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Replace the version with the version you want to use (e.g. '0.1.0')
+    implementation 'io.github.rafapear:klassfile:0.1.0'
+}
+```
+
+- Maven (pom.xml)
+
+```xml
+<repositories>
+  <repository>
+    <id>central</id>
+    <url>https://repo1.maven.org/maven2/</url>
+  </repository>
+</repositories>
+
+<dependencies>
+  <dependency>
+    <groupId>io.github.rafapear</groupId>
+    <artifactId>klassfile</artifactId>
+    <version>0.1.0</version>
+  </dependency>
+</dependencies>
+```
+
+Tip: the project publishes sources and javadoc artifacts; if you rely on a snapshot or a different release, change the version accordingly.
+
+## Design goals
+
+KlassFile is not a replacement for JVM bytecode knowledge. Its goal is to make common class-file construction more concise and discoverable in Kotlin while retaining direct control over emitted bytecode.
+
+The DSL uses reified types where they are useful—for example, `field<Int>()`, `param<String>()`, and `defineMethod<Int>("sum")`. It also exposes `KlassDesc` for cases where a descriptor must be passed explicitly.
+
+Kotlin types do not remove every runtime concern: generic arguments are erased on the JVM, the reified DSL APIs currently require non-null `T : Any`, and generated bytecode must still obey JVM rules beyond the subset KlassFile validates.
+
 
 ## Status
 
@@ -31,40 +127,8 @@
 | Control Flow (`if`, `goto`, loops, labels)   | ✅ Complete                                         |
 | Exception Handling (`try` / `catch`)         | ❌ Not implemented                                  |
 | Local Variables API                          | ✅ Complete                                         |
-| Invokedynamic / Lambdas                      | ❌ Not Planed                                       |
+| Invokedynamic / Lambdas                      | ❌ Not Planned                                      |
 
-## Test Suite Status
-
-| Test Suite       | Status     |
-|------------------|------------|
-| Argument Scope   | ✅ Complete |
-| Field Scope      | ✅ Complete |
-| Flags Scope      | ✅ Complete |
-| Method Scope     | ⏳ Pending  |
-| Code Scope       | ⏳ Pending  |
-| Class Scope      | ⏳ Pending  |
-| Locals Storage   | ⏳ Pending  |
-| Stack            | ⏳ Pending  |
-| LabelRef         | ⏳ Pending  |
-| WhileRef         | ⏳ Pending  |
-| LocalRef         | ⏳ Pending  |
-| ParamRef         | ⏳ Pending  |
-| OrderedRef       | ⏳ Pending  |
-| TypedRef         | ⏳ Pending  |
-| FieldRef         | ⏳ Pending  |
-| MethodRef        | ⏳ Pending  |
-| KlassDesc        | ⏳ Pending  |
-| Invoke Type      | ⏳ Pending  |
-| Stack Type       | ⏳ Pending  |
-| Stack Value      | ⏳ Pending  |
-| Instruction      | ⏳ Pending  |
-| Method Resolver  | ⏳ Pending  |
-| ClassDesc Utils  | ⏳ Pending  |
-| CodeScope Utils  | ⏳ Pending  |
-| Eager Delegate   | ⏳ Pending  |
-| KlassFile Errors | ⏳ Pending  |
-| KlassFile Utils  | ⏳ Pending  |
-| MethodRef Utils  | ⏳ Pending  |
 
 # Example
 
@@ -136,7 +200,7 @@ fun main() {
             }
         }
 
-        method<Unit>("increment") {
+        defineMethod<Unit>("increment") {
 
             access { public() }
 
@@ -151,7 +215,7 @@ fun main() {
             }
         }
 
-        method<Unit>("reset") {
+        defineMethod<Unit>("reset") {
 
             access { public() }
 
@@ -164,7 +228,7 @@ fun main() {
             }
         }
 
-        method<Int>("get") {
+        defineMethod<Int>("get") {
 
             access { public() }
 
@@ -176,7 +240,7 @@ fun main() {
             }
         }
 
-        method<Unit>("print") {
+        defineMethod<Unit>("print") {
 
             access { public() }
 
@@ -189,8 +253,8 @@ fun main() {
                 invokeMethod(getNumber)
 
                 // Resolve an existing JVM method using reflection.
-                val println by findMethod<PrintStream, Unit> {
-                    param<Int>()
+                val println = findMethod<PrintStream, Unit>("println") {
+                    arg<Int>()
                 }
 
                 // Invoke the resolved MethodRef.
