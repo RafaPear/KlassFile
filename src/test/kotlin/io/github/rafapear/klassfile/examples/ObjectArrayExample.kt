@@ -5,18 +5,18 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class ObjectArrayExample {
-    interface ObjectStack {
-        fun push(item: Int)
-        fun pop(): Int
+    data class Thing(val value: Int)
+
+    interface ObjectStack<T> {
+        fun push(item: T)
+        fun pop(): T
     }
 
-    @Test
-    fun `Assert a IntArray works`() {
-
-        val instance = klassFile<ObjectStack>("ObjectStack") {
+    inline fun <reified T: Any> createStack(name: String): ObjectStack<T> {
+        return klassFile<ObjectStack<T>>(name) {
             access { public() }
 
-            val arr by field<CharArray>()
+            val arr by field<Array<T>>()
             val ptr by field<Int>()
 
             constructor {
@@ -24,7 +24,7 @@ class ObjectArrayExample {
 
                 code {
                     defaultCtor()
-                    putThisField(arr) { ldc(5); newArray<Char>() }
+                    putThisField(arr) { ldc(5); newArray<T>() }
                     putThisField(ptr) { ldc(0) }
                     ret()
                 }
@@ -33,7 +33,7 @@ class ObjectArrayExample {
             defineMethod<Unit>("push") {
                 access { public() }
 
-                val item by param<Int>()
+                val item by param<Any>()
 
                 code {
                     // ARR
@@ -42,7 +42,7 @@ class ObjectArrayExample {
                     loadRef(ptr)
                     // VALUE
                     load(item)
-                    convertTo<Char>()
+                    checkCast<T>()
                     // Store the value in the array at the index
                     arrayStore()
 
@@ -56,7 +56,7 @@ class ObjectArrayExample {
                 }
             }
 
-            defineMethod<Int>("pop") {
+            defineMethod<Any>("pop") {
                 access { public() }
 
                 code {
@@ -72,19 +72,44 @@ class ObjectArrayExample {
                     loadRef(ptr)
                     // Store the value in the array at the index
                     arrayLoad()
-                    convertTo<Int>()
 
                     ret()
                 }
             }
         }.writeAndGetInstance()
+    }
 
-        instance.push(10)
-        instance.push(20)
+    @Test
+    fun `Assert a Stack works with custom objects`() {
+
+        val instance = createStack<Thing>("ThingStack")
+
+        instance.push(Thing(10))
+        instance.push(Thing(20))
         val popped1 = instance.pop()
         val popped2 = instance.pop()
 
-        assertEquals(20, popped1, "Expected 20, but got $popped1")
-        assertEquals(10, popped2, "Expected 10, but got $popped2")
+        println("Popped1: $popped1")
+        println("Popped2: $popped2")
+
+        assertEquals(20, popped1.value, "Expected 20, but got $popped1")
+        assertEquals(10, popped2.value, "Expected 10, but got $popped2")
+    }
+
+    @Test
+    fun `Assert a Stack works with Strings (example)`() {
+
+        val instance = createStack<String>("StringStack")
+
+        instance.push("str1")
+        instance.push("str2")
+        val popped1 = instance.pop()
+        val popped2 = instance.pop()
+
+        println("Popped1: $popped1")
+        println("Popped2: $popped2")
+
+        assertEquals("str2", popped1, "Expected \"str1\", but got $popped1")
+        assertEquals("str1", popped2, "Expected \"str2\", but got $popped2")
     }
 }
