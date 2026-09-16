@@ -690,9 +690,7 @@ class CodeScope<O : Any, R : Any>(
         }
 
         stack.pop()
-        stack.push(
-            top.withType(KlassDesc(destType))
-        )
+        stack.push(top.withType(KlassDesc(destType)))
     }
 
     inline fun <reified T : Any> convertTo() = convertTo(T::class)
@@ -884,7 +882,7 @@ class CodeScope<O : Any, R : Any>(
     fun checkCast(type: KlassDesc<*>) {
         val value = stack.pop()
 
-        if (type.classDesc.isPrimitive || type.kClass != Any::class)
+        if (type.classDesc.isPrimitive)
             throw CannotCheckCastPrimitiveTypeError(this, type, value.type)
 
         raw { checkcast(type.classDesc) }
