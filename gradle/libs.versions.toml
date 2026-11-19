@@ -4,7 +4,7 @@
 [versions]
 kotlin = "2.4.20"
 dokka = "2.2.0"
-sonarqube = "7.5.0.8588"
+sonarqube = "7.6.0.18749"
 nmcp = "0.0.9"
 
 [libraries]
